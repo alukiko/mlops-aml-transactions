@@ -1,0 +1,14 @@
+artifact_uri: file:///C:/Users/Jet/Desktop/itmo_2/mlops/mlops-aml-transactions/mlruns/510451930121173901/aebaae21667640989fd0af4cb5a6fc27/artifacts
+end_time: 1775466387823
+entry_point_name: ''
+experiment_id: '510451930121173901'
+lifecycle_stage: active
+run_id: aebaae21667640989fd0af4cb5a6fc27
+run_name: agreeable-calf-76
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1775466372028
+status: 3
+tags: []
+user_id: Jet

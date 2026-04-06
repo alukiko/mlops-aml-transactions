@@ -1,0 +1,7 @@
+artifact_location: file:///C:/Users/Jet/Desktop/itmo_2/mlops/mlops-aml-transactions/mlruns/510451930121173901
+creation_time: 1775465528140
+experiment_id: '510451930121173901'
+last_update_time: 1775465528140
+lifecycle_stage: active
+name: aml-transactions
+workspace: default

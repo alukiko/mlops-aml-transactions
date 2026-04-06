@@ -1,0 +1,37 @@
+artifact_path: file:///C:/Users/Jet/Desktop/itmo_2/mlops/mlops-aml-transactions/mlruns/510451930121173901/models/m-e931dc3a1e434568bf591e43dbdef938/artifacts
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
+    python_version: 3.13.5
+  sklearn:
+    code: null
+    pickled_model: model.pkl
+    serialization_format: cloudpickle
+    sklearn_version: 1.8.0
+    skops_trusted_types: null
+is_signature_from_type_hint: false
+mlflow_version: 3.10.1
+model_id: m-e931dc3a1e434568bf591e43dbdef938
+model_size_bytes: 3070840
+model_uuid: m-e931dc3a1e434568bf591e43dbdef938
+prompts: null
+run_id: 112a05ad93e9426189147794f425c264
+signature:
+  inputs: '[{"type": "string", "name": "From Bank", "required": true}, {"type": "string",
+    "name": "from_account", "required": true}, {"type": "string", "name": "To Bank",
+    "required": true}, {"type": "string", "name": "to_account", "required": true},
+    {"type": "double", "name": "Amount Received", "required": true}, {"type": "string",
+    "name": "Receiving Currency", "required": true}, {"type": "double", "name": "Amount
+    Paid", "required": true}, {"type": "string", "name": "Payment Currency", "required":
+    true}, {"type": "string", "name": "Payment Format", "required": true}, {"type":
+    "long", "name": "hour", "required": true}, {"type": "long", "name": "dayofweek",
+    "required": true}]'
+  outputs: '[{"type": "tensor", "tensor-spec": {"dtype": "int64", "shape": [-1]}}]'
+  params: null
+type_hint_from_example: false
+utc_time_created: '2026-04-06 09:03:40.720416'

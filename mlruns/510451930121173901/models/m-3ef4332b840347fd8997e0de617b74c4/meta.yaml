@@ -1,0 +1,10 @@
+artifact_location: file:///C:/Users/Jet/Desktop/itmo_2/mlops/mlops-aml-transactions/mlruns/510451930121173901/models/m-3ef4332b840347fd8997e0de617b74c4/artifacts
+creation_timestamp: 1775466383884
+experiment_id: '510451930121173901'
+last_updated_timestamp: 1775466387516
+model_id: m-3ef4332b840347fd8997e0de617b74c4
+model_type: null
+name: sklearn_pipeline_et
+source_run_id: 0557c648f74f4817a1a94715e229f5ac
+status: 2
+status_message: null

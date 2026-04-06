@@ -1,0 +1,10 @@
+artifact_location: file:///C:/Users/Jet/Desktop/itmo_2/mlops/mlops-aml-transactions/mlruns/510451930121173901/models/m-1409cf4d0a374532a6e2a32044f78304/artifacts
+creation_timestamp: 1775466375967
+experiment_id: '510451930121173901'
+last_updated_timestamp: 1775466380272
+model_id: m-1409cf4d0a374532a6e2a32044f78304
+model_type: null
+name: sklearn_pipeline_hgb
+source_run_id: 3cf5d8d077ae4dc39f7e395e123c69f9
+status: 2
+status_message: null

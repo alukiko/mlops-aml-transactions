@@ -1,0 +1,14 @@
+artifact_uri: file:///C:/Users/Jet/Desktop/itmo_2/mlops/mlops-aml-transactions/mlruns/510451930121173901/22ab579e09164df6b2337c6574ed7667/artifacts
+end_time: 1775465769313
+entry_point_name: ''
+experiment_id: '510451930121173901'
+lifecycle_stage: active
+run_id: 22ab579e09164df6b2337c6574ed7667
+run_name: rf
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1775465763323
+status: 3
+tags: []
+user_id: Jet
