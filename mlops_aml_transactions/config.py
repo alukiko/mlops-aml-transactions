@@ -1,12 +1,13 @@
+import os
 from pathlib import Path
 
 from dotenv import load_dotenv
 from loguru import logger
 
-# Load environment variables from .env file if it exists
+# Загрузка переменных окружения из .env, если файл есть
 load_dotenv()
 
-# Paths
+# Корень подпроекта mlops-aml-transactions
 PROJ_ROOT = Path(__file__).resolve().parents[1]
 logger.info(f"PROJ_ROOT path is: {PROJ_ROOT}")
 
@@ -16,13 +17,19 @@ INTERIM_DATA_DIR = DATA_DIR / "interim"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
 EXTERNAL_DATA_DIR = DATA_DIR / "external"
 
+# Сырой CSV IBM AML по умолчанию: data/raw/HI-Small_Trans.csv (положите файл в эту папку)
+DEFAULT_RAW_CSV = RAW_DATA_DIR / "HI-Small_Trans.csv"
+
 MODELS_DIR = PROJ_ROOT / "models"
+
+# MLflow: по умолчанию локальное хранилище рядом с корнем проекта
+MLRUNS_DIR = PROJ_ROOT / "mlruns"
+MLFLOW_EXPERIMENT_NAME = os.environ.get("MLFLOW_EXPERIMENT_NAME", "aml-transactions")
 
 REPORTS_DIR = PROJ_ROOT / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"
 
-# If tqdm is installed, configure loguru with tqdm.write
-# https://github.com/Delgan/loguru/issues/135
+
 try:
     from tqdm import tqdm
 

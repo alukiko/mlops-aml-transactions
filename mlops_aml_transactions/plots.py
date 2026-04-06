@@ -11,18 +11,16 @@ app = typer.Typer()
 
 @app.command()
 def main(
-    # ---- REPLACE DEFAULT PATHS AS APPROPRIATE ----
+    # При необходимости замените пути к данным и файлу графика
     input_path: Path = PROCESSED_DATA_DIR / "dataset.csv",
     output_path: Path = FIGURES_DIR / "plot.png",
-    # -----------------------------------------
 ):
-    # ---- REPLACE THIS WITH YOUR OWN CODE ----
-    logger.info("Generating plot from data...")
+    # Заготовка: сюда — загрузка данных и построение графиков
+    logger.info("Генерация графика из данных (заготовка)...")
     for i in tqdm(range(10), total=10):
         if i == 5:
-            logger.info("Something happened for iteration 5.")
-    logger.success("Plot generation complete.")
-    # -----------------------------------------
+            logger.info("Итерация 5.")
+    logger.success("Заготовка графика завершена.")
 
 
 if __name__ == "__main__":

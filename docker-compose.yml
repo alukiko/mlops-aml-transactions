@@ -1,0 +1,16 @@
+services:
+  api:
+    build: .
+    image: aml-transactions-api:local
+    ports:
+      - "8000:8000"
+    # По умолчанию модель уже внутри образа (COPY models/ в Dockerfile).
+    # Том — только если нужно подменить model.pkl без пересборки образа:
+    # volumes:
+    #   - ./models:/app/models:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
