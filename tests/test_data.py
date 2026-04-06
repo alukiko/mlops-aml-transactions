@@ -1,5 +1,4 @@
-import pytest
+"""Здесь можно добавить тесты загрузки и обработки данных.
 
-
-def test_code_is_tested():
-    assert False
+Тесты HTTP API: `test_api.py`.
+"""

@@ -5,7 +5,7 @@ build-backend = "flit_core.buildapi"
 [project]
 name = "mlops_aml_transactions"
 version = "0.0.1"
-description = "A short description of the project."
+description = "MLOps: AML-классификация банковских транзакций (IBM synthetic), API и обучение моделей."
 authors = [
   { name = "Vladimir Okladnikov, Andrey Utlyakov" },
 ]
@@ -15,7 +15,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License"
 ]
-requires-python = "~=3.10.0"
+requires-python = ">=3.10,<3.14"
 
 
 [tool.ruff]
@@ -24,7 +24,7 @@ src = ["mlops_aml_transactions"]
 include = ["pyproject.toml", "mlops_aml_transactions/**/*.py"]
 
 [tool.ruff.lint]
-extend-select = ["I"]  # Add import sorting
+extend-select = ["I"]  # сортировка импортов (isort)
 
 [tool.ruff.lint.isort]
 known-first-party = ["mlops_aml_transactions"]

@@ -1,7 +1,11 @@
 awscli
 ipython
 jupyterlab
+joblib
+lightgbm
 loguru
+mlflow
+plotly
 matplotlib
 mkdocs
 notebook
@@ -12,6 +16,7 @@ pytest
 python-dotenv
 ruff
 scikit-learn
+shap
 tqdm
 typer
 -e .

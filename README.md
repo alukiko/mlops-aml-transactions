@@ -1,61 +1,122 @@
 # mlops-aml-transactions
 
-<a target="_blank" href="https://cookiecutter-data-science.drivendata.org/">
-    <img src="https://img.shields.io/badge/CCDS-Project%20template-328F97?logo=cookiecutter" />
-</a>
+Проект на Python для **MLOps** вокруг задачи **AML** (Anti-Money Laundering): бинарная классификация банковских транзакций по синтетическому датасету IBM. Пакет `mlops_aml_transactions` включает подготовку данных, обучение модели, батч-скоринг, HTTP API и Docker-образ для предсказаний.
 
-A short description of the project.
+## Требования
 
-## Project Organization
+- Python **3.10–3.13** (см. [pyproject.toml](pyproject.toml)).
 
-```
-├── LICENSE            <- Open-source license if one is chosen
-├── Makefile           <- Makefile with convenience commands like `make data` or `make train`
-├── README.md          <- The top-level README for developers using this project.
-├── data
-│   ├── external       <- Data from third party sources.
-│   ├── interim        <- Intermediate data that has been transformed.
-│   ├── processed      <- The final, canonical data sets for modeling.
-│   └── raw            <- The original, immutable data dump.
-│
-├── docs               <- A default mkdocs project; see www.mkdocs.org for details
-│
-├── models             <- Trained and serialized models, model predictions, or model summaries
-│
-├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
-│                         the creator's initials, and a short `-` delimited description, e.g.
-│                         `1.0-jqp-initial-data-exploration`.
-│
-├── pyproject.toml     <- Project configuration file with package metadata for 
-│                         mlops_aml_transactions and configuration for tools like black
-│
-├── references         <- Data dictionaries, manuals, and all other explanatory materials.
-│
-├── reports            <- Generated analysis as HTML, PDF, LaTeX, etc.
-│   └── figures        <- Generated graphics and figures to be used in reporting
-│
-├── requirements.txt   <- The requirements file for reproducing the analysis environment, e.g.
-│                         generated with `pip freeze > requirements.txt`
-│
-├── setup.cfg          <- Configuration file for flake8
-│
-└── mlops_aml_transactions   <- Source code for use in this project.
-    │
-    ├── __init__.py             <- Makes mlops_aml_transactions a Python module
-    │
-    ├── config.py               <- Store useful variables and configuration
-    │
-    ├── dataset.py              <- Scripts to download or generate data
-    │
-    ├── features.py             <- Code to create features for modeling
-    │
-    ├── modeling                
-    │   ├── __init__.py 
-    │   ├── predict.py          <- Code to run model inference with trained models          
-    │   └── train.py            <- Code to train models
-    │
-    └── plots.py                <- Code to create visualizations
+## Установка
+
+Из каталога `mlops-aml-transactions`:
+
+```bash
+python -m pip install -U pip
+python -m pip install -r requirements.txt
 ```
 
---------
+Режим разработки (редактируемый пакет):
 
+```bash
+python -m pip install -e .
+```
+
+## Данные
+
+Сырой CSV **IBM AML** по умолчанию читается из **`data/raw/HI-Small_Trans.csv`** (внутри этого подпроекта). Скопируйте туда файл с диска или из каталога `mlops/`, где могут лежать копии датасетов — см. [README в корне репозитория](../README.md) (описание колонок и источники).
+
+Другой путь к CSV можно передать аргументом CLI (см. `--help` у `dataset.py` и `train.py`).
+
+## Конвейер: датасет, обучение, скоринг
+
+Команды реализованы через **Typer**; полный список опций — у каждого модуля:
+
+```bash
+python mlops_aml_transactions/dataset.py --help
+python mlops_aml_transactions/modeling/train.py --help
+python mlops_aml_transactions/modeling/predict.py --help
+```
+
+Типичный порядок:
+
+1. **Подготовка `data/processed/dataset.csv`** из сырого CSV (стратифицированная выборка и т.д.) — `dataset.py`.
+2. **Обучение** и сохранение **`models/model.pkl`** — `modeling/train.py` (MLflow по желанию).
+3. **Батч-предсказания** в CSV — `modeling/predict.py`.
+
+Удобная цель `make data` в [Makefile](Makefile) ставит зависимости и запускает `dataset.py` (при установленном `make`).
+
+## HTTP API
+
+Запуск сервера (из каталога проекта, с установленным пакетом):
+
+```bash
+python -m uvicorn mlops_aml_transactions.api.main:app --host 127.0.0.1 --port 8000
+```
+
+- `GET /health` — проверка работоспособности.
+- `POST /predict` — одна транзакция.
+- `POST /predict/batch` — список транзакций.
+- `GET /docs` — интерактивная документация (Swagger UI).
+- `GET /redoc` — ReDoc.
+
+Модель читается из `models/model.pkl` относительно корня подпроекта.
+
+## Docker
+
+Минимальные зависимости для образа — [requirements-api.txt](requirements-api.txt). Сборка и запуск:
+
+```bash
+docker compose up --build
+```
+
+Сервис слушает порт **8000**. При сборке в образ копируется каталог **`models/`** (положите туда `model.pkl` до `docker build`). Чтобы подменить модель без пересборки образа, в [docker-compose.yml](docker-compose.yml) можно раскомментировать том `./models:/app/models:ro`.
+
+## Тесты
+
+Из **корня** репозитория `mlops` (там лежит [pytest.ini](../pytest.ini), указывающий на тесты подпроекта):
+
+```bash
+cd ..
+python -m pytest
+```
+
+Или из каталога `mlops-aml-transactions`:
+
+```bash
+python -m pytest tests
+```
+
+## Структура каталогов
+
+```
+mlops-aml-transactions/
+├── Dockerfile              # образ API
+├── docker-compose.yml
+├── requirements.txt        # полное окружение (разработка, ноутбуки)
+├── requirements-api.txt    # только зависимости API для Docker
+├── pyproject.toml
+├── models/                 # model.pkl и др. артефакты
+├── data/
+│   ├── raw/
+│   ├── processed/          # dataset.csv и пр.
+│   └── ...
+├── notebooks/
+├── tests/                  # pytest (test_api.py и др.)
+├── docs/                   # MkDocs (при необходимости)
+├── reports/
+├── mlops_aml_transactions/
+│   ├── config.py
+│   ├── features.py
+│   ├── dataset.py
+│   ├── api/
+│   │   └── main.py         # FastAPI
+│   └── modeling/
+│       ├── train.py
+│       ├── predict.py
+│       └── artifacts.py
+└── README.md
+```
+
+## Лицензия
+
+См. файл [LICENSE](LICENSE).
