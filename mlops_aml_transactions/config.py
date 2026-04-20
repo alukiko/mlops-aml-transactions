@@ -38,6 +38,19 @@ MLFLOW_EXPERIMENT_NAME = os.environ.get("MLFLOW_EXPERIMENT_NAME", "aml-transacti
 REPORTS_DIR = PROJ_ROOT / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"
 
+# -----------------------------
+# S3 / Yandex Object Storage
+# -----------------------------
+# Если переменные не заданы — интеграция S3 отключена (код должен работать локально как раньше).
+S3_ENDPOINT_URL = os.environ.get("S3_ENDPOINT_URL", "https://storage.yandexcloud.net")
+S3_BUCKET = os.environ.get("S3_BUCKET")
+S3_DATA_PREFIX = os.environ.get("S3_DATA_PREFIX", "data/raw").strip("/")
+S3_MODELS_PREFIX = os.environ.get("S3_MODELS_PREFIX", "models").strip("/")
+
+# Стандартные переменные boto3
+AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
+
 
 try:
     from tqdm import tqdm

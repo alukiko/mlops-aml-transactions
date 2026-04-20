@@ -11,6 +11,8 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
+from mlops_aml_transactions.storage.s3 import s3_download_if_missing, s3_key_for_local_path
+
 RAW_TRANSACTION_COLUMNS = [
     "Timestamp",
     "From Bank",
@@ -32,6 +34,14 @@ def load_raw_transaction_files(files: Sequence[str | Path]) -> pd.DataFrame:
 
     for path in files:
         p = Path(path)
+        if not p.is_file():
+            # Если файла нет локально — пробуем скачать из S3 (если сконфигурировано).
+            try:
+                key = s3_key_for_local_path(p, kind="data")
+                s3_download_if_missing(p, key)
+            except Exception:
+                # Если S3 не настроен/недоступен — продолжаем как раньше.
+                pass
         if not p.is_file():
             logger.warning("File not found, skip: {}", p)
             continue

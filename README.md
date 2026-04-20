@@ -27,6 +27,31 @@ python -m pip install -e .
 
 Другой путь к CSV можно передать аргументом CLI (см. `--help` у `dataset.py` и `train.py`).
 
+## S3 (Yandex Object Storage): автоскачивание данных и моделей
+
+Проект умеет работать с S3-совместимым хранилищем (например, **Yandex Object Storage**):
+
+- если **сырого CSV** нет локально в `data/raw/`, он будет скачан из S3;
+- если **модели** нет локально в `models/`, API/скоринг попробуют скачать её из S3;
+- при **обучении** модели сохраняются локально и дополнительно загружаются в S3.
+
+Для включения S3 создайте локальный файл `.env` (он уже игнорируется git) по образцу `.env.example`:
+
+```bash
+S3_ENDPOINT_URL=https://storage.yandexcloud.net
+S3_BUCKET=mlops-aml-transactions
+S3_DATA_PREFIX=data/raw
+S3_MODELS_PREFIX=models
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+```
+
+Ожидаемые ключи объектов в бакете:
+
+- `data/raw/HI-Small_Trans.csv`
+- `data/raw/LI-Small_Trans.csv`
+- `models/model.pkl` (и при обучении: `models/{rf,et,lr,hgb}.pkl`)
+
 ## Конвейер: датасет, обучение, скоринг
 
 Команды реализованы через **Typer**; полный список опций — у каждого модуля:
