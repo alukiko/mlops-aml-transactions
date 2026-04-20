@@ -37,6 +37,7 @@ from mlops_aml_transactions.config import (
 )
 from mlops_aml_transactions.features import CATEGORICAL_FEATURES, NUMERIC_FEATURES, X_y_from_frame
 from mlops_aml_transactions.modeling.artifacts import save_model
+from mlops_aml_transactions.storage.s3 import s3_key_for_local_path, s3_upload_file
 
 app = typer.Typer()
 
@@ -377,6 +378,12 @@ def main(
                 out_file = MODELS_DIR / f"{key}.pkl"
                 save_model(out_file, pipeline, threshold=threshold)
                 mlflow.log_artifact(str(out_file))
+                # Upload trained model artifact to S3 (if configured).
+                try:
+                    s3_key = s3_key_for_local_path(out_file, kind="models")
+                    s3_upload_file(out_file, s3_key)
+                except Exception:
+                    pass
 
                 score = main_score(select_key, roc, pr, f1)
                 if score > best_score:
@@ -387,6 +394,12 @@ def main(
 
         if best_pipeline is not None and best_name is not None:
             save_model(model_path, best_pipeline, threshold=best_threshold)
+            # Upload best model artifact to S3 (if configured).
+            try:
+                s3_key = s3_key_for_local_path(model_path, kind="models")
+                s3_upload_file(model_path, s3_key)
+            except Exception:
+                pass
             mlflow.set_tag("best_model", best_name)
             mlflow.set_tag("best_select_metric", select_key)
             mlflow.log_metric(f"best_{select_key}", best_score)

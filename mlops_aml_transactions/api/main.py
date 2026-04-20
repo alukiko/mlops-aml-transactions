@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from mlops_aml_transactions.config import MODELS_DIR
 from mlops_aml_transactions.features import engineer_features
 from mlops_aml_transactions.modeling.artifacts import load_model
+from mlops_aml_transactions.storage.s3 import s3_download_if_missing, s3_key_for_local_path
 
 MODEL_PATH = MODELS_DIR / "model.pkl"
 
@@ -44,7 +45,16 @@ class BatchIn(BaseModel):
 @lru_cache(maxsize=1)
 def load_model_cached():
     if not MODEL_PATH.is_file():
-        raise FileNotFoundError(f"Model not found at {MODEL_PATH}. Run training first.")
+        # If missing locally, try S3 (if configured).
+        try:
+            key = s3_key_for_local_path(MODEL_PATH, kind="models")
+            s3_download_if_missing(MODEL_PATH, key)
+        except Exception:
+            pass
+    if not MODEL_PATH.is_file():
+        raise FileNotFoundError(
+            f"Model not found at {MODEL_PATH}. Run training first (or configure S3 download)."
+        )
     return load_model(MODEL_PATH)
 
 

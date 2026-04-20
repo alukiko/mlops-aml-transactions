@@ -9,6 +9,7 @@ import typer
 
 from mlops_aml_transactions.config import DEFAULT_RAW_CSV, PROCESSED_DATA_DIR, RAW_DATA_DIR
 from mlops_aml_transactions.features import RAW_COLUMNS
+from mlops_aml_transactions.storage.s3 import s3_download_if_missing, s3_key_for_local_path
 
 app = typer.Typer()
 
@@ -48,6 +49,11 @@ def main(
     """Сборка обработанного dataset.csv из сырого CSV IBM AML."""
     RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)
     PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Если локального файла нет — пробуем скачать из S3 (если сконфигурировано).
+    if not input_path.is_file():
+        key = s3_key_for_local_path(input_path, kind="data")
+        s3_download_if_missing(input_path, key)
 
     if not input_path.is_file():
         raise typer.BadParameter(f"Input file not found: {input_path}")
