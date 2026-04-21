@@ -1,10 +1,17 @@
 # mlops-aml-transactions
 
-Проект на Python для **MLOps** вокруг задачи **AML** (Anti-Money Laundering): бинарная классификация банковских транзакций по синтетическому датасету IBM. Пакет `mlops_aml_transactions` включает подготовку данных, обучение модели, батч-скоринг, HTTP API и Docker-образ для предсказаний.
+Проект на Python для **MLOps** вокруг задачи **AML** (Anti-Money Laundering): бинарная классификация банковских транзакций на синтетическом датасете IBM.
+
+Пакет `mlops_aml_transactions` включает:
+- подготовку данных;
+- обучение моделей;
+- batch scoring;
+- HTTP API (FastAPI);
+- Docker-образ для продового запуска.
 
 ## Требования
 
-- Python **3.10–3.13** (см. [pyproject.toml](pyproject.toml)).
+- Python **3.10-3.13** (см. [pyproject.toml](pyproject.toml)).
 
 ## Установка
 
@@ -15,7 +22,7 @@ python -m pip install -U pip
 python -m pip install -r requirements.txt
 ```
 
-Режим разработки (редактируемый пакет):
+Режим разработки:
 
 ```bash
 python -m pip install -e .
@@ -23,19 +30,20 @@ python -m pip install -e .
 
 ## Данные
 
-Сырой CSV **IBM AML** по умолчанию читается из **`data/raw/HI-Small_Trans.csv`** (внутри этого подпроекта). Скопируйте туда файл с диска или из каталога `mlops/`, где могут лежать копии датасетов — см. [README в корне репозитория](../README.md) (описание колонок и источники).
+По умолчанию сырой CSV читается из `data/raw/HI-Small_Trans.csv`.
 
-Другой путь к CSV можно передать аргументом CLI (см. `--help` у `dataset.py` и `train.py`).
+Можно:
+- положить файлы вручную в `data/raw/`;
+- или дать системе скачать их из S3 (см. раздел ниже).
 
-## S3 (Yandex Object Storage): автоскачивание данных и моделей
+## S3 (Yandex Object Storage)
 
-Проект умеет работать с S3-совместимым хранилищем (например, **Yandex Object Storage**):
+Поддерживается S3-совместимое хранилище:
+- автоскачивание сырых данных в `data/raw/`, если локально файлов нет;
+- автоскачивание `models/model.pkl`, если модель не найдена локально;
+- автозагрузка обученных артефактов в S3.
 
-- если **сырого CSV** нет локально в `data/raw/`, он будет скачан из S3;
-- если **модели** нет локально в `models/`, API/скоринг попробуют скачать её из S3;
-- при **обучении** модели сохраняются локально и дополнительно загружаются в S3.
-
-Для включения S3 создайте локальный файл `.env` (он уже игнорируется git) по образцу `.env.example`:
+Создайте `.env` по шаблону `.env.example`:
 
 ```bash
 S3_ENDPOINT_URL=https://storage.yandexcloud.net
@@ -46,15 +54,62 @@ AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
 ```
 
-Ожидаемые ключи объектов в бакете:
-
+Ожидаемые ключи в бакете:
 - `data/raw/HI-Small_Trans.csv`
 - `data/raw/LI-Small_Trans.csv`
-- `models/model.pkl` (и при обучении: `models/{rf,et,lr,hgb}.pkl`)
+- `models/model.pkl`
 
-## Конвейер: датасет, обучение, скоринг
+## Практические сценарии
 
-Команды реализованы через **Typer**; полный список опций — у каждого модуля:
+### Вариант 1: полный цикл с нуля
+
+1. Заполнить `.env`.
+2. Собрать датасет:
+
+```bash
+python -m mlops_aml_transactions.dataset \
+  --input-files HI-Small_Trans.csv,LI-Small_Trans.csv \
+  --read-cap 2000000 --sample-size 600000 --min-positive-rows 800
+```
+
+3. Запустить обучение:
+
+```bash
+python -m mlops_aml_transactions.modeling.train \
+  --run-name exp_time_recall_t06 \
+  --model-path models/model_exp_time_recall_t06.pkl \
+  --models et \
+  --split-strategy time --val-size 0.2 --test-size 0.2 \
+  --threshold-objective recall --target-recall 0.6 \
+  --min-threshold 0.001 --max-threshold 0.999
+```
+
+4. Назначить боевую модель как `models/model.pkl` и загрузить в S3.
+
+### Вариант 2: боевой Docker
+
+1. Убедиться, что есть `models/model.pkl`.
+2. Собрать и поднять сервис:
+
+```bash
+docker compose up --build -d
+```
+
+3. Проверить здоровье:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+Ожидаемо:
+
+```json
+{"status":"ok"}
+```
+
+## Конвейер
+
+Справка по CLI:
 
 ```bash
 python mlops_aml_transactions/dataset.py --help
@@ -62,86 +117,67 @@ python mlops_aml_transactions/modeling/train.py --help
 python mlops_aml_transactions/modeling/predict.py --help
 ```
 
-Типичный порядок:
+Порядок:
+1. Подготовка `data/processed/dataset.csv` (`dataset.py`).
+2. Обучение и сохранение `models/model.pkl` (`modeling/train.py`).
+3. Batch-предсказания (`modeling/predict.py`).
 
-1. **Подготовка `data/processed/dataset.csv`** из сырого CSV (стратифицированная выборка и т.д.) — `dataset.py`.
-2. **Обучение** и сохранение **`models/model.pkl`** — `modeling/train.py` (MLflow по желанию).
-3. **Батч-предсказания** в CSV — `modeling/predict.py`.
+## Быстрый гид по режимам
 
-Удобная цель `make data` в [Makefile](Makefile) ставит зависимости и запускает `dataset.py` (при установленном `make`).
+| Вариант | Split | Цель порога | Плюсы | Минусы |
+|---|---|---|---|---|
+| `ET + random + fbeta` | `random` | `fbeta (beta=1.0)` | Лучшие цифры на baseline, быстрый sanity-check | Оптимистичная оценка, риск утечки по сущностям/времени |
+| `ET + time + fbeta` | `time (60/20/20)` | `fbeta (beta=1.0)` | Реалистичнее для будущих данных, лучше контролируемый `F1` | `F1` обычно ниже, сложнее выбор порога |
+| `ET + time + recall` | `time (60/20/20)` | `recall-first` (`target_recall`) | Позволяет держать целевой recall (если достижим) | Может сильно просесть precision, много алертов |
+
+## Метрики экспериментов
+
+| Run name | Run ID | Split | Threshold objective | ROC-AUC | AP (PR-AUC) | F1 | Threshold |
+|---|---|---|---|---:|---:|---:|---:|
+| `exp_time_recall_t06` | `4f0189fe55f14692be50e28f06bcf3c0` | `time` | `recall (target=0.6)` | 0.8968 | 0.0690 | 0.0268 | 0.0010 |
+| `exp_time_fbeta_b1` | `555ff3dff7614aa1b7df7b9587f28130` | `time` | `fbeta (beta=1.0)` | 0.8968 | 0.0690 | 0.1322 | 0.3185 |
+| `exp_random_fbeta_b1` | `78e99381641c4d2294532640c110a3a8` | `random` | `fbeta (beta=1.0)` | 0.9738 | 0.5316 | 0.6066 | 0.7067 |
+
+Текущая боевая модель для Docker/API: `exp_random_fbeta_b1`  
+Артефакт: `models/model.pkl` (синхронизирован с `s3://mlops-aml-transactions/models/model.pkl`).
 
 ## HTTP API
 
-Запуск сервера (из каталога проекта, с установленным пакетом):
+Запуск:
 
 ```bash
 python -m uvicorn mlops_aml_transactions.api.main:app --host 127.0.0.1 --port 8000
 ```
 
-- `GET /health` — проверка работоспособности.
-- `POST /predict` — одна транзакция.
-- `POST /predict/batch` — список транзакций.
-- `GET /docs` — интерактивная документация (Swagger UI).
-- `GET /redoc` — ReDoc.
-
-Модель читается из `models/model.pkl` относительно корня подпроекта.
+Эндпоинты:
+- `GET /health`
+- `POST /predict`
+- `POST /predict/batch`
+- `GET /docs`
+- `GET /redoc`
 
 ## Docker
-
-Минимальные зависимости для образа — [requirements-api.txt](requirements-api.txt). Сборка и запуск:
 
 ```bash
 docker compose up --build
 ```
 
-Сервис слушает порт **8000**. При сборке в образ копируется каталог **`models/`** (положите туда `model.pkl` до `docker build`). Чтобы подменить модель без пересборки образа, в [docker-compose.yml](docker-compose.yml) можно раскомментировать том `./models:/app/models:ro`.
+Сервис слушает порт `8000`.
 
 ## Тесты
 
-Из **корня** репозитория `mlops` (там лежит [pytest.ini](../pytest.ini), указывающий на тесты подпроекта):
-
-```bash
-cd ..
-python -m pytest
-```
-
-Или из каталога `mlops-aml-transactions`:
+Из `mlops-aml-transactions`:
 
 ```bash
 python -m pytest tests
 ```
 
-## Структура каталогов
+Из корня `mlops`:
 
-```
-mlops-aml-transactions/
-├── Dockerfile              # образ API
-├── docker-compose.yml
-├── requirements.txt        # полное окружение (разработка, ноутбуки)
-├── requirements-api.txt    # только зависимости API для Docker
-├── pyproject.toml
-├── models/                 # model.pkl и др. артефакты
-├── data/
-│   ├── raw/
-│   ├── processed/          # dataset.csv и пр.
-│   └── ...
-├── notebooks/
-├── tests/                  # pytest (test_api.py и др.)
-├── docs/                   # MkDocs (при необходимости)
-├── reports/
-├── mlops_aml_transactions/
-│   ├── config.py
-│   ├── features.py
-│   ├── dataset.py
-│   ├── api/
-│   │   └── main.py         # FastAPI
-│   └── modeling/
-│       ├── train.py
-│       ├── predict.py
-│       └── artifacts.py
-└── README.md
+```bash
+python -m pytest
 ```
 
 ## Лицензия
 
-См. файл [LICENSE](LICENSE).
+См. [LICENSE](LICENSE).

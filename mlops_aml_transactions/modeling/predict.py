@@ -9,7 +9,7 @@ import typer
 from mlops_aml_transactions.config import MODELS_DIR, PROCESSED_DATA_DIR
 from mlops_aml_transactions.features import engineer_features
 from mlops_aml_transactions.modeling.artifacts import load_model
-from mlops_aml_transactions.storage.s3 import s3_download_if_missing, s3_key_for_local_path
+from mlops_aml_transactions.data.s3 import s3_download_if_missing, s3_key_for_local_path
 
 app = typer.Typer()
 

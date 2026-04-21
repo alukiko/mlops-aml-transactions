@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
-from mlops_aml_transactions.storage.s3 import s3_download_if_missing, s3_key_for_local_path
+from mlops_aml_transactions.data.s3 import s3_download_if_missing, s3_key_for_local_path
 
 RAW_TRANSACTION_COLUMNS = [
     "Timestamp",
