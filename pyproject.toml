@@ -1,32 +1,16 @@
-[build-system]
-requires = ["flit_core >=3.2,<4"]
-build-backend = "flit_core.buildapi"
-
-[project]
-name = "mlops_aml_transactions"
-version = "0.0.1"
-description = "MLOps: AML-классификация банковских транзакций (IBM synthetic), API и обучение моделей."
-authors = [
-  { name = "Vladimir Okladnikov, Andrey Utlyakov" },
-]
-license = { file = "LICENSE" }
-readme = "README.md"
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License"
-]
-requires-python = ">=3.10,<3.14"
-
+[tool.black]
+line-length = 120
+target-version = ["py311"]
 
 [tool.ruff]
-line-length = 99
-src = ["mlops_aml_transactions"]
-include = ["pyproject.toml", "mlops_aml_transactions/**/*.py"]
+line-length = 120
+target-version = "py311"
+src = ["src"]
 
 [tool.ruff.lint]
-extend-select = ["I"]  # сортировка импортов (isort)
+select = ["E", "F"]
+ignore = ["E501"]
 
-[tool.ruff.lint.isort]
-known-first-party = ["mlops_aml_transactions"]
-force-sort-within-sections = true
-
+[tool.pytest.ini_options]
+testpaths = ["src/tests"]
+pythonpath = ["src"]

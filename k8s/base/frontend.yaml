@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aml-frontend
+  namespace: aml-monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aml-frontend
+  template:
+    metadata:
+      labels:
+        app: aml-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: ghcr.io/replace-org/aml-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aml-frontend
+  namespace: aml-monitoring
+spec:
+  type: LoadBalancer
+  selector:
+    app: aml-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80

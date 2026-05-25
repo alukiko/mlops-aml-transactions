@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aml-mlflow
+  namespace: aml-monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aml-mlflow
+  template:
+    metadata:
+      labels:
+        app: aml-mlflow
+    spec:
+      containers:
+        - name: mlflow
+          image: ghcr.io/replace-org/aml-backend:latest
+          command:
+            - mlflow
+            - ui
+            - --backend-store-uri
+            - sqlite:////app/runtime/mlflow.db
+            - --default-artifact-root
+            - /app/mlartifacts
+            - --host
+            - 0.0.0.0
+            - --port
+            - "5000"
+          envFrom:
+            - configMapRef:
+                name: aml-config
+          ports:
+            - containerPort: 5000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aml-mlflow
+  namespace: aml-monitoring
+spec:
+  selector:
+    app: aml-mlflow
+  ports:
+    - name: http
+      port: 5000
+      targetPort: 5000

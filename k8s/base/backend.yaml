@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aml-backend
+  namespace: aml-monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aml-backend
+  template:
+    metadata:
+      labels:
+        app: aml-backend
+    spec:
+      containers:
+        - name: backend
+          image: ghcr.io/replace-org/aml-backend:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: aml-config
+          ports:
+            - containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aml-backend
+  namespace: aml-monitoring
+spec:
+  selector:
+    app: aml-backend
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000

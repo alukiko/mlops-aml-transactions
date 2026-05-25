@@ -1,16 +1,68 @@
 services:
-  api:
-    build: .
-    image: aml-transactions-api:local
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    environment:
+      - PYTHONPATH=/app/src
+      - RETRAIN_MAX_ROWS=100000
+      - DRIFT_SCHEDULER_ENABLED=true
+      - DRIFT_SCHEDULER_INTERVAL_SECONDS=300
+      - DRIFT_PREDICTION_LIMIT=1000
+      - DRIFT_MIN_ROWS=30
+      - MLFLOW_TRACKING_URI=sqlite:////app/runtime/mlflow.db
+      - MLFLOW_REGISTRY_URI=sqlite:////app/runtime/mlflow.db
+    volumes:
+      - ./runtime:/app/runtime
+      - ./reports:/app/reports
+      - ./models:/app/models
+      - ./mlartifacts:/app/mlartifacts
     ports:
       - "8000:8000"
-    # По умолчанию модель уже внутри образа (COPY models/ в Dockerfile).
-    # Том — только если нужно подменить model.pkl без пересборки образа:
-    # volumes:
-    #   - ./models:/app/models:ro
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
+    networks:
+      default:
+        aliases:
+          - aml-backend
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: /api
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+
+  mlflow:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    command: ["mlflow", "ui", "--backend-store-uri", "sqlite:////app/runtime/mlflow.db", "--default-artifact-root", "/app/mlartifacts", "--host", "0.0.0.0", "--port", "5000"]
+    volumes:
+      - ./runtime:/app/runtime
+      - ./mlartifacts:/app/mlartifacts
+    ports:
+      - "5000:5000"
+
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - backend
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus

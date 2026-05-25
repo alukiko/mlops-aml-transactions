@@ -1,22 +1,15 @@
-# Mac OS-specific storage files
-.DS_Store
-
-# vim
-*.swp
-*.swo
-
-## https://github.com/github/gitignore/blob/e8554d85bf62e38d6db966a50d2064ac025fd82a/Python.gitignore
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
-*$py.class
+*.pyc
 
 # C extensions
 *.so
 
 # Distribution / packaging
 .Python
+env/
+myenv/
 build/
 develop-eggs/
 dist/
@@ -28,14 +21,13 @@ lib64/
 parts/
 sdist/
 var/
-wheels/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-MANIFEST
 
 # PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
 
@@ -46,17 +38,12 @@ pip-delete-this-directory.txt
 # Unit test / coverage reports
 htmlcov/
 .tox/
-.nox/
 .coverage
 .coverage.*
 .cache
 nosetests.xml
 coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
+*,cover
 
 # Translations
 *.mo
@@ -64,102 +51,30 @@ cover/
 
 # Django stuff:
 *.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
 
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# MkDocs documentation
-docs/site/
+# Sphinx documentation
+docs/_build/
 
 # PyBuilder
-.pybuilder/
 target/
 
-# Jupyter Notebook
-.ipynb_checkpoints
+# Jupyter
+.ipynb_checkpoints/
+.~*.ipynb
+notebooks/*.ipynb
 
-# IPython
-profile_default/
-ipython_config.py
-
-# pipenv
-#Pipfile.lock
-
-# UV
-#uv.lock
-
-# poetry
-#poetry.lock
-
-# pdm
-#pdm.lock
-.pdm.toml
-.pdm-python
-.pdm-build/
-
-# pixi
-.pixi/
-
-# PEP 582
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# pytype static type analyzer
-.pytype/
-
-# Cython debug symbols
-cython_debug/
-
-# Ruff stuff:
-.ruff_cache/
-
-# PyPI configuration file
-.pypirc
-
-# Обученные модели (крупные pickle; при необходимости храните отдельно или в артефактах CI)
-models/*.pkl
-
-# Локальные данные и эксперименты MLflow (не коммитить тяжёлые CSV и прогоны)
-data/raw/*.csv
-data/processed/*.csv
+# Local experiment artifacts
 mlruns/
+models/*.pkl
+models/*.csv
+
+# Local data files
+data/*.csv
+
+# Generated monitoring runtime
+runtime/
+reports/drift/*.json
+reports/drift/*.html
+frontend/node_modules/
+frontend/dist/
+mlartifacts/
