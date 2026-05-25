@@ -5,9 +5,11 @@ import numpy as np
 import pandas as pd
 
 from .config import RAW_COLUMNS
+from .s3_data import ensure_data_available
 
 
 def load_transactions(files: list[str | Path], nrows: int | None = None) -> pd.DataFrame:
+    ensure_data_available(required=False)
     frames: list[pd.DataFrame] = []
     remaining = nrows
     for file_path in files:

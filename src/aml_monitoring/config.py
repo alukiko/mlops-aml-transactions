@@ -17,6 +17,9 @@ REFERENCE_SAMPLE_PATH = RUNTIME_DIR / "reference_sample.csv"
 DB_PATH = RUNTIME_DIR / "monitoring.db"
 
 DATA_FILES = [DATA_DIR / "HI-Small_Trans.csv", DATA_DIR / "LI-Small_Trans.csv"]
+S3_BUCKET = os.getenv("S3_BUCKET", "mlops-aml-transactions")
+S3_ENDPOINT_URL = os.getenv("S3_ENDPOINT_URL", "https://storage.yandexcloud.net")
+S3_DATA_PREFIX = os.getenv("S3_DATA_PREFIX", "data/raw")
 
 RAW_COLUMNS = [
     "Timestamp",

@@ -22,6 +22,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Download training data from S3
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          S3_ENDPOINT_URL: ${{ secrets.S3_ENDPOINT_URL || 'https://storage.yandexcloud.net' }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET || 'mlops-aml-transactions' }}
+          S3_DATA_PREFIX: ${{ secrets.S3_DATA_PREFIX || 'data/raw' }}
+        run: python -m aml_monitoring.s3_data download --required
+
       - name: Run backend tests
         env:
           PYTHONPATH: ${{ github.workspace }}/src

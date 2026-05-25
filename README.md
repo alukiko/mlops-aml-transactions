@@ -132,6 +132,47 @@ Drift job сравнивает текущие данные с reference sample. 
 - `reports/drift/*.json`
 - `reports/drift/*.html`
 
+## Данные в S3
+
+Большие CSV-файлы не хранятся в Git. Backend умеет скачивать их из S3-совместимого хранилища, например Yandex Object Storage.
+
+Ожидаемые ключи в bucket:
+
+- `data/raw/HI-Small_Trans.csv`
+- `data/raw/LI-Small_Trans.csv`
+
+Переменные окружения:
+
+```bash
+set AWS_ACCESS_KEY_ID=...
+set AWS_SECRET_ACCESS_KEY=...
+set S3_ENDPOINT_URL=https://storage.yandexcloud.net
+set S3_BUCKET=mlops-aml-transactions
+set S3_DATA_PREFIX=data/raw
+```
+
+Загрузка локальных CSV из `data/` в S3:
+
+```bash
+set PYTHONPATH=%CD%\src
+python -m aml_monitoring.s3_data upload --required
+```
+
+Скачивание CSV из S3 в `data/`:
+
+```bash
+set PYTHONPATH=%CD%\src
+python -m aml_monitoring.s3_data download --required
+```
+
+Workflow `.github/workflows/train_evaluate.yaml` перед проверками скачивает данные из S3. Для GitHub Actions нужны secrets:
+
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `S3_BUCKET`
+- `S3_ENDPOINT_URL`, optional, по умолчанию `https://storage.yandexcloud.net`
+- `S3_DATA_PREFIX`, optional, по умолчанию `data/raw`
+
 ## Web UI
 
 React UI - это рабочий интерфейс оператора, не landing page. В нем есть:
