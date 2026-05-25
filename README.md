@@ -1,21 +1,21 @@
 # AML Monitoring Platform
 
-Production-like MLOps project for AML transaction classification. The repository contains a trained LightGBM model, FastAPI inference service, React operations UI, drift reports, Prometheus/Grafana monitoring, MLflow experiment tracking, Docker Compose, Kubernetes manifests and an Argo CD application.
+Production-like MLOps-проект для классификации AML-транзакций. В проекте есть FastAPI backend для инференса, React UI для оператора, расчет drift, отчеты, Prometheus/Grafana мониторинг, MLflow tracking/model registry, Docker Compose для локальной отладки, Kubernetes manifests и Argo CD application.
 
-## Components
+## Из чего состоит проект
 
-- `src/aml_monitoring` - backend package: data loading, feature engineering, inference, drift analysis, retraining, SQLite storage and API.
-- `frontend` - React/Vite UI for inference, recent predictions, drift alerts, experiments and retraining.
-- `models` - trained model artifacts: `aml_lgbm.pkl`, `model_meta.pkl`, SHAP importance.
-- `data` - IBM AML synthetic transaction CSV files.
-- `runtime/mlflow.db` - MLflow SQLite backend store and local Model Registry metadata.
-- `mlartifacts` - MLflow model artifacts.
-- `monitoring` - Prometheus scrape config and Grafana dashboard provisioning.
-- `k8s` - Kubernetes manifests and Argo CD application.
-- `reports/drift` and `runtime` - generated reports and SQLite/reference runtime files.
-- `.github/workflows/ci_cd.yaml` - CI/CD pipeline with lint, tests, Docker image build and Argo CD sync.
+- `src/aml_monitoring` - backend-пакет: загрузка данных, feature engineering, инференс, drift-анализ, retraining, SQLite-хранилище и API.
+- `frontend` - React/Vite интерфейс: инференс, последние предсказания, drift alerts, эксперименты и запуск переобучения.
+- `models` - артефакты модели. Тяжелые `.pkl` и `.csv` артефакты не коммитятся, см. `models/README.md`.
+- `data` - место для IBM AML synthetic transaction CSV. CSV-файлы не коммитятся, см. `data/README.md`.
+- `runtime/mlflow.db` - локальное SQLite-хранилище MLflow tracking и Model Registry.
+- `mlartifacts` - MLflow artifacts.
+- `monitoring` - конфигурация Prometheus и provisioning dashboard для Grafana.
+- `k8s` - Kubernetes manifests и Argo CD application.
+- `reports/drift` и `runtime` - сгенерированные drift-отчеты, SQLite runtime DB и reference sample.
+- `.github/workflows/ci_cd.yaml` - CI/CD pipeline: линтер, тесты, сборка Docker images и Argo CD sync.
 
-## Local Python Setup
+## Локальный запуск backend без Docker
 
 ```bash
 python -m venv .venv
@@ -24,40 +24,46 @@ pip install -r requirements.txt
 set PYTHONPATH=%CD%\src
 ```
 
-Run the backend:
+Запуск FastAPI:
 
 ```bash
 uvicorn aml_monitoring.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Useful URLs:
+Полезные URL:
 
-- API docs: `http://localhost:8000/docs`
+- OpenAPI/Swagger: `http://localhost:8000/docs`
 - Prometheus metrics: `http://localhost:8000/metrics`
-- Health: `http://localhost:8000/health`
+- Health check: `http://localhost:8000/health`
 
-## Run with Docker Compose
+## Запуск через Docker Compose
 
 ```bash
 docker compose up --build
 ```
 
-Services:
+Сервисы:
 
-- UI: `http://localhost:3000`
+- Web UI: `http://localhost:3000`
 - Backend API: `http://localhost:8000`
 - MLflow UI: `http://localhost:5000`
 - Prometheus: `http://localhost:9090`
-- Grafana: `http://localhost:3001` with `admin/admin`
+- Grafana: `http://localhost:3001`, логин/пароль `admin/admin`
 
-Docker Compose uses SQLite for MLflow metadata and Model Registry:
+Остановка:
 
-- backend store: `sqlite:///runtime/mlflow.db`;
-- artifact root: `mlartifacts/`.
+```bash
+docker compose down
+```
 
-## API Examples
+Docker Compose использует SQLite для MLflow metadata и Model Registry:
 
-Prediction:
+- backend store: `sqlite:///runtime/mlflow.db`
+- artifact root: `mlartifacts/`
+
+## Примеры API
+
+Инференс:
 
 ```bash
 curl -X POST http://localhost:8000/predict ^
@@ -65,13 +71,15 @@ curl -X POST http://localhost:8000/predict ^
   -d "{\"transactions\":[{\"Timestamp\":\"2022/09/01 00:20\",\"From Bank\":\"010\",\"From Account\":\"8000EBD30\",\"To Bank\":\"010\",\"To Account\":\"8000EBD30\",\"Amount Received\":3697.34,\"Receiving Currency\":\"US Dollar\",\"Amount Paid\":3697.34,\"Payment Currency\":\"US Dollar\",\"Payment Format\":\"Reinvestment\"}]}"
 ```
 
-Run drift report:
+Запуск drift report:
 
 ```bash
 curl -X POST http://localhost:8000/drift/run -H "Content-Type: application/json" -d "{}"
 ```
 
-By default `/drift/run` uses the latest prediction payloads saved in SQLite, so alerts change as new inference traffic arrives. To run a drift check for an explicit batch:
+По умолчанию `/drift/run` берет последние payload предсказаний из SQLite. Поэтому drift alerts меняются после нового inference-трафика, а не считаются по одному и тому же файлу.
+
+Запуск drift по явному batch:
 
 ```bash
 curl -X POST http://localhost:8000/drift/run ^
@@ -79,19 +87,19 @@ curl -X POST http://localhost:8000/drift/run ^
   -d "{\"transactions\":[{\"Timestamp\":\"2022/09/01 00:20\",\"From Bank\":\"010\",\"From Account\":\"A1\",\"To Bank\":\"011\",\"To Account\":\"A2\",\"Amount Received\":100,\"Receiving Currency\":\"US Dollar\",\"Amount Paid\":100,\"Payment Currency\":\"US Dollar\",\"Payment Format\":\"Wire\"}]}"
 ```
 
-Start retraining:
+Запуск переобучения:
 
 ```bash
 curl -X POST http://localhost:8000/retrain
 ```
 
-Retraining logs parameters, metrics and artifacts to MLflow and registers the model under `aml-laundering-detector` by default. Override with:
+Retraining логирует параметры, метрики и артефакты в MLflow. Модель регистрируется под именем `aml-laundering-detector` по умолчанию. Имя можно переопределить:
 
 ```bash
 set MLFLOW_REGISTERED_MODEL_NAME=my-model-name
 ```
 
-For local Python runs, point MLflow to the same SQLite store:
+Для локального Python-запуска можно указать тот же SQLite backend:
 
 ```bash
 set MLFLOW_TRACKING_URI=sqlite:///%CD%/runtime/mlflow.db
@@ -100,39 +108,42 @@ set MLFLOW_REGISTRY_URI=sqlite:///%CD%/runtime/mlflow.db
 
 ## Drift Reports
 
-Drift jobs compare current data with a reference sample. If `runtime/reference_sample.csv` is missing, it is created from the source CSV files on first run.
+Drift job сравнивает текущие данные с reference sample. Если `runtime/reference_sample.csv` отсутствует, он создается из исходных CSV при первом запуске.
 
-In the API/UI path, current data means recent inference traffic stored in SQLite. If there are fewer than `DRIFT_MIN_ROWS` records, the run is saved with `not_enough_data` status. The local Docker Compose stack also starts an in-process scheduler:
+В API/UI текущие данные - это последние inference-запросы, сохраненные в SQLite. Если записей меньше `DRIFT_MIN_ROWS`, run сохраняется со статусом `not_enough_data`.
 
-- `DRIFT_SCHEDULER_ENABLED=true`;
-- `DRIFT_SCHEDULER_INTERVAL_SECONDS=300`;
-- `DRIFT_PREDICTION_LIMIT=1000`;
-- `DRIFT_MIN_ROWS=30`.
+В Docker Compose включен in-process scheduler:
 
-In Kubernetes, `k8s/base/drift-cronjob.yaml` runs the same check every 15 minutes by calling `POST /drift/run`. Change the CronJob `schedule` to tune the interval.
+- `DRIFT_SCHEDULER_ENABLED=true`
+- `DRIFT_SCHEDULER_INTERVAL_SECONDS=300`
+- `DRIFT_PREDICTION_LIMIT=1000`
+- `DRIFT_MIN_ROWS=30`
 
-Implemented checks:
+В Kubernetes файл `k8s/base/drift-cronjob.yaml` запускает такую же проверку каждые 15 минут через `POST /drift/run`. Интервал меняется через поле `schedule`.
 
-- data drift: PSI and KS for numeric features, PSI for categorical features;
-- target drift: target-rate change when `Is Laundering` labels are present;
-- concept drift: precision, recall, F1 and ROC-AUC drop when labels are present.
+Реализованные проверки:
 
-Reports are generated in:
+- `data drift`: PSI и KS для числовых признаков, PSI для категориальных признаков;
+- `target drift`: изменение доли `Is Laundering`, если в batch есть labels;
+- `concept drift`: падение precision/recall/F1/ROC-AUC, если в batch есть labels.
+
+Отчеты создаются здесь:
 
 - `reports/drift/*.json`
 - `reports/drift/*.html`
 
-## UI
+## Web UI
 
-The React UI is an operations workspace, not a landing page. It includes:
+React UI - это рабочий интерфейс оператора, не landing page. В нем есть:
 
-- inference form with JSON single/batch input;
-- table of recent predictions and anomaly flags;
-- drift alert panel and report list;
-- MLflow experiment table;
-- retraining button and job status table.
+- страница инференса с JSON single/batch input;
+- таблица последних предсказаний;
+- anomaly flags;
+- Drift Alerts с историей проверок и ссылками на отчеты;
+- страница экспериментов MLflow;
+- кнопка `Start retraining` и таблица retraining jobs.
 
-For local frontend development:
+Локальный запуск frontend для разработки:
 
 ```bash
 cd frontend
@@ -140,70 +151,81 @@ npm install
 npm run dev
 ```
 
-Set `VITE_API_URL=http://localhost:8000` when running Vite directly.
+Если Vite запускается отдельно, задайте:
+
+```bash
+set VITE_API_URL=http://localhost:8000
+```
 
 ## Monitoring
 
-The backend exposes Prometheus metrics at `/metrics`, including:
+Backend отдает Prometheus metrics на `/metrics`.
 
-- API request count and latency;
-- prediction count;
+Основные метрики:
+
+- количество API-запросов и latency;
+- количество prediction-запросов;
 - anomaly rate;
-- average laundering probability;
-- data, target and concept drift scores;
-- retraining status.
+- средняя вероятность laundering;
+- data/target/concept drift scores;
+- retraining status;
+- качество модели: ROC-AUC, PR-AUC, precision, recall, F1, F2, threshold.
 
-Grafana is provisioned with the dashboard `AML Monitoring`.
+Grafana автоматически поднимает dashboard `AML Monitoring`.
 
-## Kubernetes and Argo CD
+## Kubernetes и Argo CD
 
-Manifests are in `k8s/base`. The default namespace is `aml-monitoring`.
+Манифесты находятся в `k8s/base`. Namespace по умолчанию:
 
-Before deploying, replace placeholders:
+```text
+aml-monitoring
+```
 
-- image names in `k8s/base/backend.yaml`, `frontend.yaml`, `mlflow.yaml`, `retraining-job.yaml`;
-- `repoURL` in `k8s/argocd/application.yaml`;
-- secret values in `k8s/base/secret.yaml`;
-- storage and ingress/load balancer settings as required by your cluster.
+Перед деплоем нужно заменить placeholders:
 
-Apply directly:
+- image names в `k8s/base/backend.yaml`, `frontend.yaml`, `mlflow.yaml`, `retraining-job.yaml`;
+- `repoURL` в `k8s/argocd/application.yaml`;
+- secret values в `k8s/base/secret.yaml`;
+- storage/ingress/load balancer настройки под ваш cluster или Minikube.
+
+Прямой деплой:
 
 ```bash
 kubectl apply -k k8s/base
 ```
 
-Apply through Argo CD:
+Деплой через Argo CD:
 
 ```bash
 kubectl apply -f k8s/argocd/application.yaml
 ```
 
-Argo CD will sync the manifests from the configured Git repository path `k8s/base`.
+Argo CD будет синхронизировать manifests из пути `k8s/base`.
 
 ## CI/CD
 
-GitHub Actions workflow `.github/workflows/ci_cd.yaml` runs on pull requests to `main` and pushes to `main`.
+GitHub Actions workflow `.github/workflows/ci_cd.yaml` запускается на pull request в `main` и push в `main`.
 
-Pipeline stages:
+Этапы pipeline:
 
-- lint backend with `ruff`;
-- run backend tests with `pytest`;
-- build frontend with `npm run build`;
-- build backend and frontend Docker images;
-- push images to GHCR on `main`;
-- sync the Argo CD application on `main`.
+- lint backend через `ruff`;
+- backend tests через `pytest`;
+- frontend build через `npm run build`;
+- сборка backend/frontend Docker images;
+- push images в GHCR на `main`;
+- Argo CD sync на `main`.
 
-Required GitHub secrets for deploy:
+Secrets для deploy:
 
 - `ARGOCD_SERVER`
 - `ARGOCD_AUTH_TOKEN`
-- optional `ARGOCD_APP`, default `aml-monitoring`
+- optional `ARGOCD_APP`, по умолчанию `aml-monitoring`
 
-## Tests
+## Тесты
 
 ```bash
 set PYTHONPATH=%CD%\src
 pytest src/tests
 ```
 
-The test suite covers feature engineering and drift calculators. API and UI smoke tests can be added after the Docker stack is running in CI.
+Тесты покрывают feature engineering, стабильное кодирование категорий, drift calculators, API endpoints, retraining sampling и подбор threshold.
