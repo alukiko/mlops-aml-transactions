@@ -1,0 +1,16 @@
+[tool.black]
+line-length = 120
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["src/tests"]
+pythonpath = ["src"]

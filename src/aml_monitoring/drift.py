@@ -1,0 +1,194 @@
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import pandas as pd
+from sklearn.metrics import f1_score, precision_score, recall_score, roc_auc_score
+
+from .config import DATA_FILES, FEATURE_COLS, MODEL_META_PATH, REFERENCE_SAMPLE_PATH, REPORT_DIR, TARGET
+from .data import load_transactions, sample_reference
+from .features import engineer_features
+from .inference import get_model_service
+
+
+NUMERIC_RAW = ["Amount Received", "Amount Paid"]
+CATEGORICAL_RAW = ["Receiving Currency", "Payment Currency", "Payment Format", "From Bank", "To Bank"]
+
+
+def psi(expected: pd.Series, actual: pd.Series, buckets: int = 10) -> float:
+    expected = pd.to_numeric(expected, errors="coerce").dropna()
+    actual = pd.to_numeric(actual, errors="coerce").dropna()
+    if len(expected) < 2 or len(actual) < 2:
+        return 0.0
+    quantiles = np.unique(np.quantile(expected, np.linspace(0, 1, buckets + 1)))
+    if len(quantiles) < 3:
+        quantiles = np.linspace(float(expected.min()), float(expected.max()) + 1e-9, buckets + 1)
+    expected_counts = np.histogram(expected, bins=quantiles)[0] / max(len(expected), 1)
+    actual_counts = np.histogram(actual, bins=quantiles)[0] / max(len(actual), 1)
+    expected_counts = np.clip(expected_counts, 1e-6, None)
+    actual_counts = np.clip(actual_counts, 1e-6, None)
+    return float(np.sum((actual_counts - expected_counts) * np.log(actual_counts / expected_counts)))
+
+
+def categorical_psi(expected: pd.Series, actual: pd.Series) -> float:
+    expected_counts = expected.fillna("UNK").astype(str).value_counts(normalize=True)
+    actual_counts = actual.fillna("UNK").astype(str).value_counts(normalize=True)
+    categories = sorted(set(expected_counts.index) | set(actual_counts.index))
+    score = 0.0
+    for category in categories:
+        exp = max(float(expected_counts.get(category, 0.0)), 1e-6)
+        act = max(float(actual_counts.get(category, 0.0)), 1e-6)
+        score += (act - exp) * np.log(act / exp)
+    return float(score)
+
+
+def ks_statistic(expected: pd.Series, actual: pd.Series) -> float:
+    expected_values = np.sort(pd.to_numeric(expected, errors="coerce").dropna().to_numpy())
+    actual_values = np.sort(pd.to_numeric(actual, errors="coerce").dropna().to_numpy())
+    if len(expected_values) == 0 or len(actual_values) == 0:
+        return 0.0
+    values = np.sort(np.unique(np.concatenate([expected_values, actual_values])))
+    exp_cdf = np.searchsorted(expected_values, values, side="right") / len(expected_values)
+    act_cdf = np.searchsorted(actual_values, values, side="right") / len(actual_values)
+    return float(np.max(np.abs(exp_cdf - act_cdf)))
+
+
+def get_reference() -> pd.DataFrame:
+    if REFERENCE_SAMPLE_PATH.exists():
+        return pd.read_csv(REFERENCE_SAMPLE_PATH)
+    return sample_reference(DATA_FILES, REFERENCE_SAMPLE_PATH)
+
+
+def run_drift(
+    batch: list[dict[str, Any]] | None = None,
+    batch_path: str | None = None,
+    min_rows: int = 1,
+    source: str = "dataset",
+) -> dict[str, Any]:
+    reference = get_reference()
+    if batch_path:
+        current = load_transactions([batch_path])
+        source = f"batch_path:{batch_path}"
+    elif batch is not None:
+        current = pd.DataFrame(batch)
+    else:
+        current = load_transactions([DATA_FILES[-1]], nrows=50000)
+
+    if len(current) < min_rows:
+        result = {
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "status": "not_enough_data",
+            "source": source,
+            "data_drift": {"score": 0.0, "threshold": 0.2, "metrics": [], "feature_metrics": []},
+            "target_drift": {"status": "not_enough_labels", "score": None, "threshold": 0.02},
+            "concept_drift": {"status": "not_enough_labels", "metrics": {}, "threshold": 0.05},
+            "rows": {"reference": len(reference), "current": len(current), "min_required": min_rows},
+        }
+        json_path, html_path = write_report(result)
+        result["report_json"] = str(json_path)
+        result["report_html"] = str(html_path)
+        return result
+
+    reference_features = engineer_features(reference)
+    current_features = engineer_features(current)
+
+    data_metrics = []
+    for column in NUMERIC_RAW:
+        data_metrics.append(
+            {
+                "feature": column,
+                "kind": "numeric",
+                "psi": psi(reference_features[column], current_features[column]),
+                "ks": ks_statistic(reference_features[column], current_features[column]),
+            }
+        )
+    for column in CATEGORICAL_RAW:
+        data_metrics.append(
+            {
+                "feature": column,
+                "kind": "categorical",
+                "psi": categorical_psi(reference_features[column], current_features[column]),
+                "ks": None,
+            }
+        )
+
+    feature_metrics = [
+        {"feature": column, "kind": "model_feature", "psi": psi(reference_features[column], current_features[column]), "ks": ks_statistic(reference_features[column], current_features[column])}
+        for column in FEATURE_COLS
+        if column in reference_features.columns and column in current_features.columns
+    ]
+
+    all_scores = [metric["psi"] for metric in data_metrics + feature_metrics]
+    data_drift_score = float(max(all_scores) if all_scores else 0.0)
+    data_drift_threshold = 0.2
+
+    target_drift = {"status": "not_enough_labels", "score": None, "threshold": 0.02}
+    concept_drift = {"status": "not_enough_labels", "metrics": {}, "threshold": 0.05}
+    if TARGET in current_features.columns and current_features[TARGET].notna().sum() > 20:
+        ref_rate = float(reference_features[TARGET].mean()) if TARGET in reference_features else 0.0
+        cur_rate = float(current_features[TARGET].mean())
+        score = abs(cur_rate - ref_rate)
+        target_drift = {"status": "drift" if score >= 0.02 else "ok", "score": score, "reference_rate": ref_rate, "current_rate": cur_rate, "threshold": 0.02}
+
+        service = get_model_service()
+        probabilities = [row["probability"] for row in service.predict(current.to_dict(orient="records"))]
+        y_true = current_features[TARGET].fillna(0).astype(int).to_numpy()
+        y_pred = (np.array(probabilities) >= service.threshold).astype(int)
+        metrics = {
+            "precision": float(precision_score(y_true, y_pred, zero_division=0)),
+            "recall": float(recall_score(y_true, y_pred, zero_division=0)),
+            "f1": float(f1_score(y_true, y_pred, zero_division=0)),
+        }
+        if len(set(y_true)) > 1:
+            metrics["roc_auc"] = float(roc_auc_score(y_true, probabilities))
+        baseline = {}
+        if MODEL_META_PATH.exists():
+            import joblib
+
+            baseline = joblib.load(MODEL_META_PATH).get("metrics", {})
+        baseline_f1 = float(baseline.get("oof_f1", metrics["f1"]))
+        f1_drop = max(0.0, baseline_f1 - metrics["f1"])
+        concept_drift = {"status": "drift" if f1_drop >= 0.05 else "ok", "metrics": metrics, "baseline_f1": baseline_f1, "score": f1_drop, "threshold": 0.05}
+
+    result = {
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "status": "drift" if data_drift_score >= data_drift_threshold or target_drift.get("status") == "drift" or concept_drift.get("status") == "drift" else "ok",
+        "source": source,
+        "data_drift": {"score": data_drift_score, "threshold": data_drift_threshold, "metrics": data_metrics, "feature_metrics": feature_metrics},
+        "target_drift": target_drift,
+        "concept_drift": concept_drift,
+        "rows": {"reference": len(reference), "current": len(current)},
+    }
+    json_path, html_path = write_report(result)
+    result["report_json"] = str(json_path)
+    result["report_html"] = str(html_path)
+    return result
+
+
+def write_report(result: dict[str, Any]) -> tuple[Path, Path]:
+    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    json_path = REPORT_DIR / f"drift_{stamp}.json"
+    html_path = REPORT_DIR / f"drift_{stamp}.html"
+    json_path.write_text(json.dumps(result, indent=2, default=str), encoding="utf-8")
+    row_parts = []
+    for metric in result["data_drift"]["metrics"]:
+        ks_value = "" if metric["ks"] is None else f"{metric['ks']:.4f}"
+        row_parts.append(
+            f"<tr><td>{metric['feature']}</td><td>{metric['kind']}</td>"
+            f"<td>{metric['psi']:.4f}</td><td>{ks_value}</td></tr>"
+        )
+    rows = "".join(row_parts)
+    html = f"""<!doctype html>
+<html><head><meta charset="utf-8"><title>AML drift report</title>
+<style>body{{font-family:Arial,sans-serif;margin:32px;color:#17202a}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #d5d8dc;padding:8px}}th{{background:#f4f6f7}}</style></head>
+<body><h1>AML drift report</h1><p>Status: <b>{result['status']}</b></p>
+<p>Data drift score: {result['data_drift']['score']:.4f} / threshold {result['data_drift']['threshold']}</p>
+<p>Target drift: {result['target_drift']['status']}</p>
+<p>Concept drift: {result['concept_drift']['status']}</p>
+<h2>Raw feature metrics</h2><table><thead><tr><th>Feature</th><th>Kind</th><th>PSI</th><th>KS</th></tr></thead><tbody>{rows}</tbody></table>
+</body></html>"""
+    html_path.write_text(html, encoding="utf-8")
+    return json_path, html_path

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aml-config
+  namespace: aml-monitoring
+data:
+  PYTHONPATH: /app/src
+  RETRAIN_MAX_ROWS: "100000"
+  DRIFT_SCHEDULER_ENABLED: "false"
+  DRIFT_SCHEDULER_INTERVAL_SECONDS: "900"
+  DRIFT_PREDICTION_LIMIT: "1000"
+  DRIFT_MIN_ROWS: "30"
+  MLFLOW_TRACKING_URI: sqlite:////app/runtime/mlflow.db
+  MLFLOW_REGISTRY_URI: sqlite:////app/runtime/mlflow.db
+  MLFLOW_DEFAULT_ARTIFACT_ROOT: /app/mlartifacts

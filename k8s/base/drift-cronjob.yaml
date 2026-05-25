@@ -1,0 +1,26 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: aml-drift-check
+  namespace: aml-monitoring
+spec:
+  schedule: "*/15 * * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: drift-check
+              image: curlimages/curl:8.8.0
+              args:
+                - -fsS
+                - -X
+                - POST
+                - http://aml-backend:8000/drift/run
+                - -H
+                - "Content-Type: application/json"
+                - -d
+                - '{"use_recent_predictions":true}'

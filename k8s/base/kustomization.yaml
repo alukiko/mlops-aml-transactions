@@ -1,0 +1,10 @@
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secret.yaml
+  - backend.yaml
+  - frontend.yaml
+  - mlflow.yaml
+  - prometheus-grafana.yaml
+  - retraining-job.yaml
+  - drift-cronjob.yaml
