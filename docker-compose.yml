@@ -16,6 +16,7 @@ services:
       - ./runtime:/app/runtime
       - ./reports:/app/reports
       - ./models:/app/models
+      - ./data:/app/data:ro
       - ./mlartifacts:/app/mlartifacts
     ports:
       - "8000:8000"
@@ -41,6 +42,7 @@ services:
     command: ["mlflow", "ui", "--backend-store-uri", "sqlite:////app/runtime/mlflow.db", "--default-artifact-root", "/app/mlartifacts", "--host", "0.0.0.0", "--port", "5000"]
     volumes:
       - ./runtime:/app/runtime
+      - ./data:/app/data:ro
       - ./mlartifacts:/app/mlartifacts
     ports:
       - "5000:5000"
