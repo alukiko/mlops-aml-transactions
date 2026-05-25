@@ -30,7 +30,12 @@ jobs:
           S3_ENDPOINT_URL: ${{ secrets.S3_ENDPOINT_URL || 'https://storage.yandexcloud.net' }}
           S3_BUCKET: ${{ secrets.S3_BUCKET || 'mlops-aml-transactions' }}
           S3_DATA_PREFIX: ${{ secrets.S3_DATA_PREFIX || 'data/raw' }}
-        run: python -m aml_monitoring.s3_data download --required
+        run: |
+          echo "S3_ENDPOINT_URL=${S3_ENDPOINT_URL}"
+          echo "S3_BUCKET=${S3_BUCKET}"
+          echo "S3_DATA_PREFIX=${S3_DATA_PREFIX}"
+          python -m aml_monitoring.s3_data check
+          python -m aml_monitoring.s3_data download --required
 
       - name: Run backend tests
         env:

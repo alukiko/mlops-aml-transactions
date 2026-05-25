@@ -68,6 +68,11 @@ mlruns/
 models/*.pkl
 models/*.csv
 
+# Local secrets
+.env
+.env.*
+*.env
+
 # Local data files
 data/*.csv
 

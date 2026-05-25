@@ -72,7 +72,7 @@ jobs:
   deploy-argocd:
     runs-on: ubuntu-latest
     needs: build-images
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && vars.ENABLE_ARGOCD_DEPLOY == 'true'
     steps:
       - name: Install Argo CD CLI
         run: |
