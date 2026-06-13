@@ -7,6 +7,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -34,6 +37,10 @@ jobs:
           echo "S3_ENDPOINT_URL=${S3_ENDPOINT_URL}"
           echo "S3_BUCKET=${S3_BUCKET}"
           echo "S3_DATA_PREFIX=${S3_DATA_PREFIX}"
+          if [ -z "$AWS_ACCESS_KEY_ID" ]; then
+            echo "⚠️ AWS_ACCESS_KEY_ID not set — skipping S3 data download (unit tests will run without training data)"
+            exit 0
+          fi
           python -m aml_monitoring.s3_data check
           python -m aml_monitoring.s3_data download --required
 

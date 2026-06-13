@@ -5,6 +5,7 @@ metadata:
   namespace: aml-monitoring
 spec:
   schedule: "*/15 * * * *"
+  suspend: true
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
   jobTemplate:

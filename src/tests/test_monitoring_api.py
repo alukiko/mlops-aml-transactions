@@ -46,6 +46,18 @@ def test_predict_endpoint(monkeypatch):
     assert response.json()["results"][0]["predicted_class"] == 0
 
 
+def test_predict_returns_503_when_model_is_missing(monkeypatch):
+    def missing_model():
+        raise FileNotFoundError("models/aml_lgbm.pkl")
+
+    monkeypatch.setattr(main, "get_model_service", missing_model)
+    client = TestClient(main.app)
+    response = client.post("/predict", json={"transactions": [{"Amount Paid": 100.0}]})
+
+    assert response.status_code == 503
+    assert "Model is not available" in response.json()["detail"]
+
+
 def test_metrics_endpoint():
     client = TestClient(main.app)
     response = client.get("/metrics")

@@ -6,8 +6,8 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/replace-org/replace-repo.git
-    targetRevision: main
+    repoURL: https://github.com/alukiko/mlops-aml-transactions.git
+    targetRevision: argocd-demo
     path: k8s/base
   destination:
     server: https://kubernetes.default.svc
