@@ -11,7 +11,7 @@ MLARTIFACTS_DIR = PROJECT_ROOT / "mlartifacts"
 MLFLOW_SQLITE_PATH = RUNTIME_DIR / "mlflow.db"
 DEFAULT_MLFLOW_TRACKING_URI = f"sqlite:///{MLFLOW_SQLITE_PATH.as_posix()}"
 
-MODEL_FILENAME = os.getenv("MODEL_FILENAME", "hgb.pkl")
+MODEL_FILENAME = os.getenv("MODEL_FILENAME", "hgb_compat.pkl")
 MODEL_PATH = MODEL_DIR / MODEL_FILENAME
 MODEL_META_PATH = MODEL_DIR / "model_meta.pkl"
 REFERENCE_SAMPLE_PATH = RUNTIME_DIR / "reference_sample.csv"
