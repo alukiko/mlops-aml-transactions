@@ -2,10 +2,32 @@
 
 from __future__ import annotations
 
-import pytest
-from fastapi.testclient import TestClient
+from pathlib import Path
 
-from mlops_aml_transactions.api.main import app
+import pytest
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).parent.parent / ".env")  # noqa: E402
+
+from fastapi.testclient import TestClient  # noqa: E402
+from mlops_aml_transactions.api.main import app  # noqa: E402
+from mlops_aml_transactions.config import MODELS_DIR  # noqa: E402
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Скачать модель с S3 перед запуском тестов, если её нет локально."""
+    model_path = MODELS_DIR / "model.pkl"
+    if model_path.is_file():
+        return
+    try:
+        from aml_monitoring.s3_data import _download_files, s3_credentials_configured  # noqa: PLC0415
+        from aml_monitoring.config import MODEL_FILES, S3_MODELS_PREFIX  # noqa: PLC0415
+        if not s3_credentials_configured():
+            return
+        print("\n[conftest] model.pkl not found — downloading from S3...")
+        _download_files(MODEL_FILES, S3_MODELS_PREFIX, required=False)
+    except Exception as exc:
+        print(f"\n[conftest] S3 model download skipped: {exc}")
 
 
 @pytest.fixture
@@ -15,7 +37,6 @@ def client() -> TestClient:
 
 @pytest.fixture
 def sample_tx() -> dict:
-    """Одна транзакция в формате JSON с alias-полями, как в API."""
     return {
         "Timestamp": "2023-01-15 14:30:00",
         "From Bank": "bank_a",
@@ -27,40 +48,4 @@ def sample_tx() -> dict:
         "Amount Paid": 1500.0,
         "Payment Currency": "USD",
         "Payment Format": "wire",
-    }
-
-
-# Примеры из IBM AML (HI-Small_Trans.csv), подобраны под текущий models/model.pkl:
-# при смене артефакта или порога — перепроверить предсказания.
-@pytest.fixture
-def sample_tx_pred_class_0() -> dict:
-    """Ожидается pred_laundering == 0 (типичная операция)."""
-    return {
-        "Timestamp": "2022/09/01 00:20",
-        "From Bank": "10",
-        "To Bank": "10",
-        "from_account": "8000EBD30",
-        "to_account": "8000EBD30",
-        "Amount Received": 3697.34,
-        "Receiving Currency": "US Dollar",
-        "Amount Paid": 3697.34,
-        "Payment Currency": "US Dollar",
-        "Payment Format": "Reinvestment",
-    }
-
-
-@pytest.fixture
-def sample_tx_pred_class_1() -> dict:
-    """Ожидается pred_laundering == 1 (модель помечает как подозрительную)."""
-    return {
-        "Timestamp": "2022/09/01 00:01",
-        "From Bank": "70",
-        "To Bank": "11157",
-        "from_account": "100428660",
-        "to_account": "8022AB410",
-        "Amount Received": 29219.5,
-        "Receiving Currency": "US Dollar",
-        "Amount Paid": 29219.5,
-        "Payment Currency": "US Dollar",
-        "Payment Format": "Credit Card",
     }

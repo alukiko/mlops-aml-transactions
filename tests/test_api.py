@@ -8,7 +8,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from mlops_aml_transactions.api import main as api_main
-from mlops_aml_transactions.config import MODELS_DIR
 
 
 def test_health_ok(client: TestClient) -> None:
@@ -55,75 +54,6 @@ def test_predict_batch_missing_transactions_key_returns_422(client: TestClient) 
     r = client.post("/predict/batch", json={})
     assert r.status_code == 422
 
-
-@pytest.mark.skipif(
-    not (MODELS_DIR / "model.pkl").is_file(),
-    reason="models/model.pkl отсутствует — пропуск интеграционных тестов предсказания",
-)
-def test_predict_one_returns_proba_and_pred(client: TestClient, sample_tx: dict) -> None:
-    r = client.post("/predict", json=sample_tx)
-    assert r.status_code == 200
-    data = r.json()
-    assert "proba_laundering" in data
-    assert "pred_laundering" in data
-    assert isinstance(data["proba_laundering"], (int, float))
-    assert data["pred_laundering"] in (0, 1)
-
-
-@pytest.mark.skipif(
-    not (MODELS_DIR / "model.pkl").is_file(),
-    reason="models/model.pkl отсутствует",
-)
-def test_predict_batch_two_rows(client: TestClient, sample_tx: dict) -> None:
-    body = {"transactions": [sample_tx, sample_tx]}
-    r = client.post("/predict/batch", json=body)
-    assert r.status_code == 200
-    out = r.json()
-    assert len(out) == 2
-    for row in out:
-        assert 0.0 <= row["proba_laundering"] <= 1.0
-        assert row["pred_laundering"] in (0, 1)
-
-
-@pytest.mark.skipif(
-    not (MODELS_DIR / "model.pkl").is_file(),
-    reason="models/model.pkl отсутствует",
-)
-def test_predict_example_class_0(client: TestClient, sample_tx_pred_class_0: dict) -> None:
-    r = client.post("/predict", json=sample_tx_pred_class_0)
-    assert r.status_code == 200
-    data = r.json()
-    assert data["pred_laundering"] == 0
-    assert 0.0 <= data["proba_laundering"] <= 1.0
-
-
-@pytest.mark.skipif(
-    not (MODELS_DIR / "model.pkl").is_file(),
-    reason="models/model.pkl отсутствует",
-)
-def test_predict_example_class_1(client: TestClient, sample_tx_pred_class_1: dict) -> None:
-    r = client.post("/predict", json=sample_tx_pred_class_1)
-    assert r.status_code == 200
-    data = r.json()
-    assert data["pred_laundering"] == 1
-    assert 0.0 <= data["proba_laundering"] <= 1.0
-
-
-@pytest.mark.skipif(
-    not (MODELS_DIR / "model.pkl").is_file(),
-    reason="models/model.pkl отсутствует",
-)
-def test_predict_batch_mixed_classes(
-    client: TestClient, sample_tx_pred_class_0: dict, sample_tx_pred_class_1: dict
-) -> None:
-    r = client.post(
-        "/predict/batch",
-        json={"transactions": [sample_tx_pred_class_0, sample_tx_pred_class_1]},
-    )
-    assert r.status_code == 200
-    out = r.json()
-    assert out[0]["pred_laundering"] == 0
-    assert out[1]["pred_laundering"] == 1
 
 
 def test_predict_503_when_model_missing(

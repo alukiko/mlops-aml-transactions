@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from functools import lru_cache
 
 import pandas as pd
@@ -13,7 +14,17 @@ from mlops_aml_transactions.storage.s3 import s3_download_if_missing, s3_key_for
 
 MODEL_PATH = MODELS_DIR / "model.pkl"
 
-app = FastAPI(title="AML transaction scoring", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        load_model_cached()
+    except FileNotFoundError:
+        pass
+    yield
+
+
+app = FastAPI(title="AML transaction scoring", version="0.1.0", lifespan=lifespan)
 
 
 class TransactionIn(BaseModel):
@@ -56,14 +67,6 @@ def load_model_cached():
             f"Model not found at {MODEL_PATH}. Run training first (or configure S3 download)."
         )
     return load_model(MODEL_PATH)
-
-
-@app.on_event("startup")
-def startup_load_model() -> None:
-    try:
-        load_model_cached()
-    except FileNotFoundError:
-        pass
 
 
 @app.get("/health")

@@ -13,16 +13,6 @@ from .retraining import run_retraining
 from .schemas import DriftRunRequest, PredictRequest
 from .storage import Store
 
-app = FastAPI(title="AML Monitoring API", version="1.0.0")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-app.add_middleware(PrometheusMiddleware)
-
 store = Store()
 
 
@@ -58,19 +48,27 @@ async def drift_scheduler_loop() -> None:
             pass
 
 
-@app.on_event("startup")
-async def start_drift_scheduler() -> None:
+@contextlib.asynccontextmanager
+async def lifespan(app: FastAPI):
     if DRIFT_SCHEDULER_ENABLED:
         app.state.drift_scheduler_task = asyncio.create_task(drift_scheduler_loop())
-
-
-@app.on_event("shutdown")
-async def stop_drift_scheduler() -> None:
+    yield
     task = getattr(app.state, "drift_scheduler_task", None)
     if task:
         task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await task
+
+
+app = FastAPI(title="AML Monitoring API", version="1.0.0", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.add_middleware(PrometheusMiddleware)
 
 
 @app.get("/health")
@@ -82,7 +80,11 @@ def health() -> dict:
 def predict(request: PredictRequest) -> dict:
     if not request.transactions:
         raise HTTPException(status_code=400, detail="transactions must not be empty")
-    results = get_model_service().predict(request.transactions)
+    try:
+        svc = get_model_service()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=f"Model is not available: {e}") from e
+    results = svc.predict(request.transactions)
     for result in results:
         store.add_prediction(
             result["payload"],
