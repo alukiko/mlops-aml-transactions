@@ -63,7 +63,7 @@ jobs:
           S3_MODELS_PREFIX: ${{ secrets.S3_MODELS_PREFIX || 'models' }}
         run: |
           pip install boto3
-          python -m aml_monitoring.s3_data models-download --required
+          python -m aml_monitoring.s3_data models-download
       - uses: docker/login-action@v3
         if: github.event_name == 'push'
         with:
