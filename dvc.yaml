@@ -1,0 +1,29 @@
+stages:
+  prepare_data:
+    cmd: python -c "import sys; sys.path.insert(0, 'src'); from aml_monitoring.s3_data import main; main()" download --required
+    deps:
+      - src/aml_monitoring/s3_data.py
+      - src/aml_monitoring/config.py
+    outs:
+      - data/HI-Small_Trans.csv
+      - data/LI-Small_Trans.csv
+
+  retrain:
+    cmd: python -c "import sys; sys.path.insert(0, 'src'); from aml_monitoring.cli import main; main()" retrain
+    deps:
+      - data/HI-Small_Trans.csv
+      - data/LI-Small_Trans.csv
+      - src/aml_monitoring
+    outs:
+      - models/aml_lgbm.pkl
+      - models/model_meta.pkl
+  drift_report:
+    cmd: python -c "import sys; sys.path.insert(0, 'src'); from aml_monitoring.cli import main; main()" drift
+    deps:
+      - data/HI-Small_Trans.csv
+      - data/LI-Small_Trans.csv
+      - models/aml_lgbm.pkl
+      - models/model_meta.pkl
+      - src/aml_monitoring
+    outs:
+      - reports/drift

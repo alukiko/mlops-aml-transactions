@@ -10,6 +10,7 @@ data:
   DRIFT_SCHEDULER_INTERVAL_SECONDS: "900"
   DRIFT_PREDICTION_LIMIT: "1000"
   DRIFT_MIN_ROWS: "30"
+  MODEL_FILENAME: hgb_compat.pkl
   MLFLOW_TRACKING_URI: sqlite:////app/runtime/mlflow.db
   MLFLOW_REGISTRY_URI: sqlite:////app/runtime/mlflow.db
   MLFLOW_DEFAULT_ARTIFACT_ROOT: /app/mlartifacts

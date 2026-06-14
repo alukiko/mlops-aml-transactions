@@ -82,4 +82,7 @@ reports/drift/*.json
 reports/drift/*.html
 frontend/node_modules/
 frontend/dist/
+frontend/tools/
 mlartifacts/
+tools/
+.npm-cache/

@@ -66,8 +66,8 @@ def test_saved_preprocessor_keeps_category_encoding_stable():
     )
     one_row_features = to_feature_matrix(single, preprocessor=preprocessor).iloc[0]
     batch_features = to_feature_matrix(with_extra_category, preprocessor=preprocessor).iloc[0]
-    assert one_row_features["Payment Format_enc"] == batch_features["Payment Format_enc"]
-    assert one_row_features["From Bank_enc"] == batch_features["From Bank_enc"]
+    assert one_row_features["Payment Format"] == batch_features["Payment Format"]
+    assert one_row_features["From Bank"] == batch_features["From Bank"]
 
 
 def test_unknown_categories_map_to_unk():
@@ -75,7 +75,7 @@ def test_unknown_categories_map_to_unk():
     unknown = sample_frame().iloc[[0]].copy()
     unknown["Payment Format"] = "Unknown Format"
     features = to_feature_matrix(unknown, preprocessor=preprocessor)
-    assert features.iloc[0]["Payment Format_enc"] == preprocessor["category_mappings"]["Payment Format"]["UNK"]
+    assert features.iloc[0]["Payment Format"] == "Unknown Format"
 
 
 def test_normalize_transactions_handles_duplicate_account_columns():

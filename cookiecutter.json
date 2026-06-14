@@ -1,0 +1,14 @@
+{
+  "project_name": "AML Monitoring Platform",
+  "repo_name": "mlops-aml-transactions",
+  "package_name": "aml_monitoring",
+  "ml_task": "binary AML transaction classification",
+  "api_framework": "FastAPI",
+  "frontend_framework": "React + Vite",
+  "experiment_tracker": "MLflow",
+  "data_versioning": "DVC",
+  "orchestrator": "Kubernetes + Argo CD",
+  "monitoring_stack": "Prometheus + Grafana",
+  "ci_cd": "GitHub Actions",
+  "git_flow": "GitHub Flow"
+}
