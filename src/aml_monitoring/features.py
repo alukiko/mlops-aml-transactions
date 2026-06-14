@@ -19,6 +19,19 @@ RECEIVER_AGG_COLS = [
     "recv_unique_sender",
 ]
 
+# Columns expected by the trained sklearn pipeline (ColumnTransformer)
+_PIPELINE_COLS = [
+    "From Bank", "from_account", "To Bank", "to_account",
+    "Amount Received", "Receiving Currency", "Amount Paid", "Payment Currency", "Payment Format",
+    "in_known_pattern", "hour", "dayofweek", "day", "is_weekend",
+    "log_amt_received", "log_amt_paid", "amount_abs_diff", "same_currency",
+    "sender_tx_count_prev", "receiver_tx_count_prev",
+    "sender_mean_paid_prev", "sender_std_paid_prev",
+    "receiver_mean_received_prev", "time_since_prev_sender_tx",
+    "time_since_prev_receiver_tx", "sender_unique_receivers_prev",
+    "receiver_unique_senders_prev",
+]
+
 
 def build_preprocessor(df: pd.DataFrame) -> dict:
     data = normalize_transactions(df)
@@ -126,9 +139,84 @@ def engineer_features(df: pd.DataFrame, preprocessor: dict | None = None) -> pd.
     return data
 
 
+def _compute_prev_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Compute per-account rolling stats from previous transactions in the batch."""
+    df = df.copy()
+    ts = pd.to_datetime(df["Timestamp"], errors="coerce")
+    df["_ts"] = ts
+    df["_order"] = range(len(df))
+
+    prev_cols = [
+        "sender_tx_count_prev", "sender_mean_paid_prev", "sender_std_paid_prev",
+        "sender_unique_receivers_prev", "time_since_prev_sender_tx",
+        "receiver_tx_count_prev", "receiver_mean_received_prev",
+        "receiver_unique_senders_prev", "time_since_prev_receiver_tx",
+    ]
+    for col in prev_cols:
+        df[col] = 0.0
+
+    for i in range(1, len(df)):
+        sender = df.at[df.index[i], "from_account"]
+        recv = df.at[df.index[i], "to_account"]
+        cur_ts = df.at[df.index[i], "_ts"]
+
+        prev_s = df.iloc[:i][df.iloc[:i]["from_account"] == sender]
+        if len(prev_s) > 0:
+            df.at[df.index[i], "sender_tx_count_prev"] = len(prev_s)
+            df.at[df.index[i], "sender_mean_paid_prev"] = prev_s["Amount Paid"].mean()
+            df.at[df.index[i], "sender_std_paid_prev"] = prev_s["Amount Paid"].std(ddof=0)
+            df.at[df.index[i], "sender_unique_receivers_prev"] = prev_s["to_account"].nunique()
+            last_ts = prev_s["_ts"].iloc[-1]
+            if pd.notna(last_ts) and pd.notna(cur_ts):
+                df.at[df.index[i], "time_since_prev_sender_tx"] = max(0.0, (cur_ts - last_ts).total_seconds() / 60)
+
+        prev_r = df.iloc[:i][df.iloc[:i]["to_account"] == recv]
+        if len(prev_r) > 0:
+            df.at[df.index[i], "receiver_tx_count_prev"] = len(prev_r)
+            df.at[df.index[i], "receiver_mean_received_prev"] = prev_r["Amount Received"].mean()
+            df.at[df.index[i], "receiver_unique_senders_prev"] = prev_r["from_account"].nunique()
+            last_ts = prev_r["_ts"].iloc[-1]
+            if pd.notna(last_ts) and pd.notna(cur_ts):
+                df.at[df.index[i], "time_since_prev_receiver_tx"] = max(0.0, (cur_ts - last_ts).total_seconds() / 60)
+
+    return df.drop(columns=["_ts", "_order"])
+
+
 def to_feature_matrix(df: pd.DataFrame, preprocessor: dict | None = None) -> pd.DataFrame:
-    features = engineer_features(df, preprocessor=preprocessor)
-    for column in FEATURE_COLS:
-        if column not in features.columns:
-            features[column] = 0
-    return features[FEATURE_COLS].replace([np.inf, -np.inf], 0).fillna(0)
+    """Build the feature matrix expected by the trained sklearn pipeline."""
+    data = df.copy()
+
+    # Normalize account and bank column names; pipeline OrdinalEncoder expects strings
+    if "From Account" in data.columns:
+        data["from_account"] = data["From Account"].fillna("UNK").astype(str)
+    if "To Account" in data.columns:
+        data["to_account"] = data["To Account"].fillna("UNK").astype(str)
+    data["from_account"] = data.get("from_account", pd.Series(["UNK"] * len(data), index=data.index)).fillna("UNK").astype(str)
+    data["to_account"] = data.get("to_account", pd.Series(["UNK"] * len(data), index=data.index)).fillna("UNK").astype(str)
+    data["From Bank"] = data["From Bank"].fillna("UNK").astype(str)
+    data["To Bank"] = data["To Bank"].fillna("UNK").astype(str)
+
+    # Temporal features
+    ts = pd.to_datetime(data["Timestamp"], errors="coerce")
+    data["hour"] = ts.dt.hour.fillna(0).astype(int)
+    data["dayofweek"] = ts.dt.dayofweek.fillna(0).astype(int)
+    data["day"] = ts.dt.day.fillna(1).astype(int)
+    data["is_weekend"] = (data["dayofweek"] >= 5).astype(int)
+
+    # Amount features
+    data["Amount Received"] = pd.to_numeric(data["Amount Received"], errors="coerce").fillna(0.0)
+    data["Amount Paid"] = pd.to_numeric(data["Amount Paid"], errors="coerce").fillna(0.0)
+    data["log_amt_received"] = np.log1p(data["Amount Received"].clip(lower=0))
+    data["log_amt_paid"] = np.log1p(data["Amount Paid"].clip(lower=0))
+    data["amount_abs_diff"] = (data["Amount Received"] - data["Amount Paid"]).abs()
+    data["same_currency"] = (data["Receiving Currency"] == data["Payment Currency"]).astype(int)
+    data["in_known_pattern"] = 0
+
+    # Per-account rolling features from batch history
+    data = _compute_prev_features(data)
+
+    for col in _PIPELINE_COLS:
+        if col not in data.columns:
+            data[col] = 0
+
+    return data[_PIPELINE_COLS].replace([np.inf, -np.inf], 0).fillna(0)

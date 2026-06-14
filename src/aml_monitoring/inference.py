@@ -12,9 +12,15 @@ from .metrics import record_model_metrics
 
 class ModelService:
     def __init__(self) -> None:
-        self.model = joblib.load(MODEL_PATH)
-        self.meta = joblib.load(MODEL_META_PATH) if MODEL_META_PATH.exists() else {}
-        self.threshold = float(self.meta.get("best_threshold", DEFAULT_THRESHOLD))
+        raw = joblib.load(MODEL_PATH)
+        if isinstance(raw, dict):
+            self.model = raw["pipeline"]
+            self.threshold = float(raw.get("threshold", DEFAULT_THRESHOLD))
+            self.meta: dict = {}
+        else:
+            self.model = raw
+            self.meta = joblib.load(MODEL_META_PATH) if MODEL_META_PATH.exists() else {}
+            self.threshold = float(self.meta.get("best_threshold", DEFAULT_THRESHOLD))
         self.preprocessor = self.meta.get("preprocessor")
         record_model_metrics(self.meta.get("metrics", {}), self.threshold)
 
