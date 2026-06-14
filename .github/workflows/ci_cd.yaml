@@ -61,6 +61,7 @@ jobs:
           S3_ENDPOINT_URL: ${{ secrets.S3_ENDPOINT_URL || 'https://storage.yandexcloud.net' }}
           S3_BUCKET: ${{ secrets.S3_BUCKET || 'mlops-aml-transactions' }}
           S3_MODELS_PREFIX: ${{ secrets.S3_MODELS_PREFIX || 'models' }}
+          MODEL_FILENAME: hgb.pkl
         run: |
           pip install boto3
           python -m aml_monitoring.s3_data models-download --required
