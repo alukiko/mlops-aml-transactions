@@ -11,13 +11,13 @@ MLARTIFACTS_DIR = PROJECT_ROOT / "mlartifacts"
 MLFLOW_SQLITE_PATH = RUNTIME_DIR / "mlflow.db"
 DEFAULT_MLFLOW_TRACKING_URI = f"sqlite:///{MLFLOW_SQLITE_PATH.as_posix()}"
 
-MODEL_PATH = MODEL_DIR / "aml_lgbm.pkl"
+MODEL_PATH = MODEL_DIR / "model.pkl"
 MODEL_META_PATH = MODEL_DIR / "model_meta.pkl"
 REFERENCE_SAMPLE_PATH = RUNTIME_DIR / "reference_sample.csv"
 DB_PATH = RUNTIME_DIR / "monitoring.db"
 
 DATA_FILES = [DATA_DIR / "HI-Small_Trans.csv", DATA_DIR / "LI-Small_Trans.csv"]
-MODEL_FILES = [MODEL_DIR / "aml_lgbm.pkl", MODEL_DIR / "model_meta.pkl"]
+MODEL_FILES = [MODEL_DIR / "model.pkl"]
 S3_BUCKET = os.getenv("S3_BUCKET", "mlops-aml-transactions")
 S3_ENDPOINT_URL = os.getenv("S3_ENDPOINT_URL", "https://storage.yandexcloud.net")
 S3_DATA_PREFIX = os.getenv("S3_DATA_PREFIX", "data/raw")
