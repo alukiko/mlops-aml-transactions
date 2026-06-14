@@ -18,3 +18,5 @@ pre-commit
 ruff
 httpx
 boto3
+loguru
+python-dotenv
