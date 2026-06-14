@@ -2,82 +2,74 @@
   "uid": "aml-monitoring",
   "title": "AML Monitoring",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 3,
   "refresh": "10s",
-  "time": {
-    "from": "now-1h",
-    "to": "now"
-  },
+  "time": { "from": "now-1h", "to": "now" },
   "panels": [
     {
-      "type": "stat",
-      "title": "API Requests",
-      "gridPos": {"x": 0, "y": 0, "w": 4, "h": 4},
+      "id": 1, "type": "row", "title": "Overview",
+      "gridPos": {"x": 0, "y": 0, "w": 24, "h": 1}, "collapsed": false
+    },
+    {
+      "id": 2, "type": "stat", "title": "API Requests Total",
+      "gridPos": {"x": 0, "y": 1, "w": 4, "h": 4},
       "targets": [{"expr": "sum(aml_api_requests_total)", "refId": "A"}]
     },
     {
-      "type": "stat",
-      "title": "Predictions",
-      "gridPos": {"x": 4, "y": 0, "w": 4, "h": 4},
+      "id": 3, "type": "stat", "title": "Predictions Total",
+      "gridPos": {"x": 4, "y": 1, "w": 4, "h": 4},
       "targets": [{"expr": "sum(aml_predictions_total)", "refId": "A"}]
     },
     {
-      "type": "gauge",
-      "title": "Anomaly Rate",
-      "gridPos": {"x": 8, "y": 0, "w": 4, "h": 4},
-      "fieldConfig": {"defaults": {"min": 0, "max": 1, "unit": "percentunit"}},
+      "id": 4, "type": "gauge", "title": "Anomaly Rate",
+      "gridPos": {"x": 8, "y": 1, "w": 4, "h": 4},
+      "fieldConfig": {"defaults": {"min": 0, "max": 1, "unit": "percentunit", "thresholds": {"steps": [{"value": 0, "color": "green"}, {"value": 0.05, "color": "yellow"}, {"value": 0.15, "color": "red"}]}}},
       "targets": [{"expr": "aml_anomaly_rate", "refId": "A"}]
     },
     {
-      "type": "gauge",
-      "title": "Avg Laundering Probability",
-      "gridPos": {"x": 12, "y": 0, "w": 4, "h": 4},
-      "fieldConfig": {"defaults": {"min": 0, "max": 1, "unit": "percentunit"}},
+      "id": 5, "type": "gauge", "title": "Avg Laundering Probability",
+      "gridPos": {"x": 12, "y": 1, "w": 4, "h": 4},
+      "fieldConfig": {"defaults": {"min": 0, "max": 1, "unit": "percentunit", "thresholds": {"steps": [{"value": 0, "color": "green"}, {"value": 0.1, "color": "yellow"}, {"value": 0.3, "color": "red"}]}}},
       "targets": [{"expr": "aml_average_laundering_probability", "refId": "A"}]
     },
     {
-      "type": "stat",
-      "title": "Model Threshold",
-      "gridPos": {"x": 16, "y": 0, "w": 4, "h": 4},
+      "id": 6, "type": "stat", "title": "Model Threshold",
+      "gridPos": {"x": 16, "y": 1, "w": 4, "h": 4},
       "fieldConfig": {"defaults": {"decimals": 3}},
       "targets": [{"expr": "aml_model_threshold", "refId": "A"}]
     },
     {
-      "type": "stat",
-      "title": "Retraining Status",
-      "gridPos": {"x": 20, "y": 0, "w": 4, "h": 4},
-      "description": "queued=1, running=2, completed=3, failed=4",
+      "id": 7, "type": "stat", "title": "Retraining Status",
+      "gridPos": {"x": 20, "y": 1, "w": 4, "h": 4},
+      "description": "1=queued 2=running 3=completed 4=failed",
+      "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"1": {"text": "Queued", "color": "yellow"}, "2": {"text": "Running", "color": "blue"}, "3": {"text": "Completed", "color": "green"}, "4": {"text": "Failed", "color": "red"}}}]}},
       "targets": [{"expr": "aml_retraining_status", "refId": "A"}]
     },
+
     {
-      "type": "timeseries",
-      "title": "API Request Rate by Endpoint",
-      "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
-      "targets": [
-        {
-          "expr": "sum(rate(aml_api_requests_total[5m])) by (path, status)",
-          "refId": "A",
-          "legendFormat": "{{path}} {{status}}"
-        }
-      ]
+      "id": 10, "type": "row", "title": "API Performance",
+      "gridPos": {"x": 0, "y": 5, "w": 24, "h": 1}, "collapsed": false
     },
     {
-      "type": "timeseries",
-      "title": "Request Latency p95 by Endpoint",
-      "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
+      "id": 11, "type": "timeseries", "title": "Request Rate by Endpoint",
+      "gridPos": {"x": 0, "y": 6, "w": 12, "h": 8},
+      "fieldConfig": {"defaults": {"unit": "reqps"}},
+      "targets": [{"expr": "sum(rate(aml_api_requests_total[5m])) by (path, status)", "refId": "A", "legendFormat": "{{path}} {{status}}"}]
+    },
+    {
+      "id": 12, "type": "timeseries", "title": "Request Latency p95 by Endpoint",
+      "gridPos": {"x": 12, "y": 6, "w": 12, "h": 8},
       "fieldConfig": {"defaults": {"unit": "s"}},
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.95, sum(rate(aml_api_request_latency_seconds_bucket[5m])) by (le, path))",
-          "refId": "A",
-          "legendFormat": "{{path}}"
-        }
-      ]
+      "targets": [{"expr": "histogram_quantile(0.95, sum(rate(aml_api_request_latency_seconds_bucket[5m])) by (le, path))", "refId": "A", "legendFormat": "p95 {{path}}"}]
+    },
+
+    {
+      "id": 20, "type": "row", "title": "Model Quality",
+      "gridPos": {"x": 0, "y": 14, "w": 24, "h": 1}, "collapsed": false
     },
     {
-      "type": "timeseries",
-      "title": "Model Quality",
-      "gridPos": {"x": 0, "y": 12, "w": 12, "h": 8},
+      "id": 21, "type": "timeseries", "title": "Model Quality Metrics",
+      "gridPos": {"x": 0, "y": 15, "w": 14, "h": 8},
       "fieldConfig": {"defaults": {"min": 0, "max": 1}},
       "targets": [
         {"expr": "aml_model_roc_auc", "refId": "A", "legendFormat": "ROC-AUC"},
@@ -89,46 +81,155 @@
       ]
     },
     {
-      "type": "bargauge",
-      "title": "Prediction Classes",
-      "gridPos": {"x": 12, "y": 12, "w": 6, "h": 8},
-      "targets": [
-        {
-          "expr": "sum(aml_predictions_total) by (predicted_class)",
-          "refId": "A",
-          "legendFormat": "class {{predicted_class}}"
-        }
-      ]
+      "id": 22, "type": "bargauge", "title": "Predictions by Class",
+      "gridPos": {"x": 14, "y": 15, "w": 5, "h": 8},
+      "options": {"orientation": "horizontal"},
+      "targets": [{"expr": "sum(aml_predictions_total) by (predicted_class)", "refId": "A", "legendFormat": "class {{predicted_class}}"}]
     },
     {
-      "type": "stat",
-      "title": "Training Data",
-      "gridPos": {"x": 18, "y": 12, "w": 6, "h": 8},
+      "id": 23, "type": "stat", "title": "Training Data",
+      "gridPos": {"x": 19, "y": 15, "w": 5, "h": 8},
       "targets": [
         {"expr": "aml_model_train_rows", "refId": "A", "legendFormat": "rows"},
         {"expr": "aml_model_train_positives", "refId": "B", "legendFormat": "positives"}
       ]
     },
+
     {
-      "type": "timeseries",
-      "title": "Drift Scores",
-      "gridPos": {"x": 0, "y": 20, "w": 12, "h": 8},
+      "id": 30, "type": "row", "title": "Data Drift",
+      "gridPos": {"x": 0, "y": 23, "w": 24, "h": 1}, "collapsed": false
+    },
+    {
+      "id": 31, "type": "stat", "title": "Data Drift Status",
+      "description": "0=not_enough_data  1=ok  2=drift",
+      "gridPos": {"x": 0, "y": 24, "w": 4, "h": 4},
+      "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"0": {"text": "No data", "color": "gray"}, "1": {"text": "OK", "color": "green"}, "2": {"text": "DRIFT", "color": "red"}}}]}},
+      "targets": [{"expr": "aml_data_drift_status", "refId": "A"}]
+    },
+    {
+      "id": 32, "type": "gauge", "title": "Data Drift Score (max PSI)",
+      "gridPos": {"x": 4, "y": 24, "w": 4, "h": 4},
+      "fieldConfig": {"defaults": {"min": 0, "max": 0.5, "thresholds": {"steps": [{"value": 0, "color": "green"}, {"value": 0.1, "color": "yellow"}, {"value": 0.2, "color": "red"}]}}},
+      "targets": [{"expr": "aml_data_drift_score", "refId": "A"}]
+    },
+    {
+      "id": 33, "type": "timeseries", "title": "Data Drift Score Over Time",
+      "gridPos": {"x": 8, "y": 24, "w": 16, "h": 4},
+      "fieldConfig": {"defaults": {"custom": {"lineWidth": 2}}, "overrides": [{"matcher": {"id": "byName", "options": "threshold"}, "properties": [{"id": "custom.lineStyle", "value": {"dash": [6, 3], "fill": "dash"}}, {"id": "color", "value": {"fixedColor": "red", "mode": "fixed"}}]}]},
       "targets": [
-        {"expr": "aml_data_drift_score", "refId": "A", "legendFormat": "data"},
-        {"expr": "aml_target_drift_score", "refId": "B", "legendFormat": "target"},
-        {"expr": "aml_concept_drift_score", "refId": "C", "legendFormat": "concept"}
+        {"expr": "aml_data_drift_score", "refId": "A", "legendFormat": "data drift score"},
+        {"expr": "0.2 + aml_data_drift_score * 0", "refId": "B", "legendFormat": "threshold (0.2)"}
       ]
     },
     {
-      "type": "timeseries",
-      "title": "API Errors",
-      "gridPos": {"x": 12, "y": 20, "w": 12, "h": 8},
+      "id": 34, "type": "bargauge", "title": "Per-Feature PSI (Numeric & Categorical)",
+      "description": "PSI < 0.1 = stable | 0.1–0.2 = moderate | > 0.2 = significant drift",
+      "gridPos": {"x": 0, "y": 28, "w": 12, "h": 9},
+      "options": {"orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"]}},
+      "fieldConfig": {"defaults": {"thresholds": {"steps": [{"value": 0, "color": "green"}, {"value": 0.1, "color": "yellow"}, {"value": 0.2, "color": "red"}]}, "min": 0, "max": 0.5}},
+      "targets": [{"expr": "aml_feature_drift_psi", "refId": "A", "legendFormat": "{{feature}} ({{kind}})"}]
+    },
+    {
+      "id": 35, "type": "bargauge", "title": "Per-Feature KS Statistic (Numeric)",
+      "description": "KS statistic for numeric features — higher = more drift",
+      "gridPos": {"x": 12, "y": 28, "w": 12, "h": 9},
+      "options": {"orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"]}},
+      "fieldConfig": {"defaults": {"thresholds": {"steps": [{"value": 0, "color": "green"}, {"value": 0.1, "color": "yellow"}, {"value": 0.3, "color": "red"}]}, "min": 0, "max": 1}},
+      "targets": [{"expr": "aml_feature_drift_ks", "refId": "A", "legendFormat": "{{feature}}"}]
+    },
+
+    {
+      "id": 40, "type": "row", "title": "Target Drift",
+      "gridPos": {"x": 0, "y": 37, "w": 24, "h": 1}, "collapsed": false
+    },
+    {
+      "id": 41, "type": "stat", "title": "Target Drift Status",
+      "description": "0=no_labels  1=ok  2=drift",
+      "gridPos": {"x": 0, "y": 38, "w": 4, "h": 4},
+      "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"0": {"text": "No labels", "color": "gray"}, "1": {"text": "OK", "color": "green"}, "2": {"text": "DRIFT", "color": "red"}}}]}},
+      "targets": [{"expr": "aml_target_drift_status", "refId": "A"}]
+    },
+    {
+      "id": 42, "type": "gauge", "title": "Target Drift Score",
+      "description": "|current_rate - reference_rate|, threshold 0.02",
+      "gridPos": {"x": 4, "y": 38, "w": 4, "h": 4},
+      "fieldConfig": {"defaults": {"min": 0, "max": 0.1, "thresholds": {"steps": [{"value": 0, "color": "green"}, {"value": 0.02, "color": "red"}]}}},
+      "targets": [{"expr": "aml_target_drift_score", "refId": "A"}]
+    },
+    {
+      "id": 43, "type": "timeseries", "title": "Positive Rate: Reference vs Current",
+      "description": "Fraction of laundering transactions — divergence = target drift",
+      "gridPos": {"x": 8, "y": 38, "w": 16, "h": 8},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0}},
       "targets": [
-        {
-          "expr": "sum(rate(aml_api_requests_total{status!~\"2..\"}[5m])) by (path, status)",
-          "refId": "A",
-          "legendFormat": "{{path}} {{status}}"
-        }
+        {"expr": "aml_target_drift_reference_rate", "refId": "A", "legendFormat": "reference positive rate"},
+        {"expr": "aml_target_drift_current_rate", "refId": "B", "legendFormat": "current positive rate"},
+        {"expr": "aml_target_drift_score", "refId": "C", "legendFormat": "absolute diff (target drift score)"}
+      ]
+    },
+    {
+      "id": 44, "type": "timeseries", "title": "Target Drift Score Over Time",
+      "gridPos": {"x": 0, "y": 42, "w": 8, "h": 4},
+      "fieldConfig": {"defaults": {"custom": {"lineWidth": 2}}},
+      "targets": [
+        {"expr": "aml_target_drift_score", "refId": "A", "legendFormat": "target drift"},
+        {"expr": "0.02 + aml_target_drift_score * 0", "refId": "B", "legendFormat": "threshold (0.02)"}
+      ]
+    },
+
+    {
+      "id": 50, "type": "row", "title": "Concept Drift",
+      "gridPos": {"x": 0, "y": 46, "w": 24, "h": 1}, "collapsed": false
+    },
+    {
+      "id": 51, "type": "stat", "title": "Concept Drift Status",
+      "description": "0=no_labels  1=ok  2=drift",
+      "gridPos": {"x": 0, "y": 47, "w": 4, "h": 4},
+      "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"0": {"text": "No labels", "color": "gray"}, "1": {"text": "OK", "color": "green"}, "2": {"text": "DRIFT", "color": "red"}}}]}},
+      "targets": [{"expr": "aml_concept_drift_status", "refId": "A"}]
+    },
+    {
+      "id": 52, "type": "gauge", "title": "Concept Drift Score (F1 drop)",
+      "description": "F1 drop vs training baseline, threshold 0.05",
+      "gridPos": {"x": 4, "y": 47, "w": 4, "h": 4},
+      "fieldConfig": {"defaults": {"min": 0, "max": 0.3, "thresholds": {"steps": [{"value": 0, "color": "green"}, {"value": 0.05, "color": "red"}]}}},
+      "targets": [{"expr": "aml_concept_drift_score", "refId": "A"}]
+    },
+    {
+      "id": 53, "type": "timeseries", "title": "Model Performance on Labelled Batches",
+      "description": "Metrics computed on recent predictions with known labels",
+      "gridPos": {"x": 8, "y": 47, "w": 16, "h": 8},
+      "fieldConfig": {"defaults": {"min": 0, "max": 1}},
+      "targets": [
+        {"expr": "aml_concept_drift_precision", "refId": "A", "legendFormat": "Precision (current batch)"},
+        {"expr": "aml_concept_drift_recall", "refId": "B", "legendFormat": "Recall (current batch)"},
+        {"expr": "aml_concept_drift_f1", "refId": "C", "legendFormat": "F1 (current batch)"},
+        {"expr": "aml_concept_drift_roc_auc", "refId": "D", "legendFormat": "ROC-AUC (current batch)"},
+        {"expr": "aml_concept_drift_baseline_f1", "refId": "E", "legendFormat": "Baseline F1 (training)"}
+      ]
+    },
+    {
+      "id": 54, "type": "timeseries", "title": "Concept Drift Score Over Time",
+      "gridPos": {"x": 0, "y": 51, "w": 8, "h": 4},
+      "fieldConfig": {"defaults": {"custom": {"lineWidth": 2}}},
+      "targets": [
+        {"expr": "aml_concept_drift_score", "refId": "A", "legendFormat": "F1 drop"},
+        {"expr": "0.05 + aml_concept_drift_score * 0", "refId": "B", "legendFormat": "threshold (0.05)"}
+      ]
+    },
+
+    {
+      "id": 60, "type": "row", "title": "All Drift Scores Combined",
+      "gridPos": {"x": 0, "y": 55, "w": 24, "h": 1}, "collapsed": false
+    },
+    {
+      "id": 61, "type": "timeseries", "title": "Data / Target / Concept Drift — Combined View",
+      "gridPos": {"x": 0, "y": 56, "w": 24, "h": 9},
+      "fieldConfig": {"defaults": {"custom": {"lineWidth": 2}}},
+      "targets": [
+        {"expr": "aml_data_drift_score", "refId": "A", "legendFormat": "data drift (PSI max)"},
+        {"expr": "aml_target_drift_score", "refId": "B", "legendFormat": "target drift (|Δ positive rate|)"},
+        {"expr": "aml_concept_drift_score", "refId": "C", "legendFormat": "concept drift (F1 drop)"}
       ]
     }
   ]

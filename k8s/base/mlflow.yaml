@@ -16,6 +16,7 @@ spec:
       containers:
         - name: mlflow
           image: ghcr.io/alukiko/mlops-aml-transactions/aml-backend:latest
+          imagePullPolicy: IfNotPresent
           command:
             - mlflow
             - ui

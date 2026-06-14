@@ -167,28 +167,99 @@ def run_drift(
     return result
 
 
+def _status_badge(status: str) -> str:
+    colors = {"ok": "#27ae60", "drift": "#e74c3c", "not_enough_data": "#7f8c8d", "not_enough_labels": "#7f8c8d"}
+    color = colors.get(status, "#7f8c8d")
+    return f'<span style="background:{color};color:#fff;padding:3px 10px;border-radius:4px;font-size:13px">{status}</span>'
+
+
+def _psi_color(psi: float) -> str:
+    if psi >= 0.2:
+        return "#e74c3c"
+    if psi >= 0.1:
+        return "#f39c12"
+    return "#27ae60"
+
+
 def write_report(result: dict[str, Any]) -> tuple[Path, Path]:
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     json_path = REPORT_DIR / f"drift_{stamp}.json"
     html_path = REPORT_DIR / f"drift_{stamp}.html"
     json_path.write_text(json.dumps(result, indent=2, default=str), encoding="utf-8")
+
+    # Data drift table sorted by PSI descending
+    all_metrics = result["data_drift"]["metrics"] + result["data_drift"].get("feature_metrics", [])
+    all_metrics_sorted = sorted(all_metrics, key=lambda m: m.get("psi", 0.0), reverse=True)
     row_parts = []
-    for metric in result["data_drift"]["metrics"]:
-        ks_value = "" if metric["ks"] is None else f"{metric['ks']:.4f}"
+    for metric in all_metrics_sorted:
+        psi_val = metric.get("psi", 0.0)
+        ks_str = "" if metric.get("ks") is None else f"{metric['ks']:.4f}"
+        psi_color = _psi_color(psi_val)
         row_parts.append(
             f"<tr><td>{metric['feature']}</td><td>{metric['kind']}</td>"
-            f"<td>{metric['psi']:.4f}</td><td>{ks_value}</td></tr>"
+            f"<td style='color:{psi_color};font-weight:bold'>{psi_val:.4f}</td><td>{ks_str}</td></tr>"
         )
     rows = "".join(row_parts)
+
+    # Target drift section
+    td = result.get("target_drift", {})
+    target_html = f"""
+      <p>Status: {_status_badge(td.get('status','?'))}&nbsp; Score: <b>{td.get('score', 'N/A') if td.get('score') is None else f"{td['score']:.4f}"}</b> / threshold {td.get('threshold', 0.02)}</p>
+      {"<p>Reference positive rate: <b>" + f"{td['reference_rate']:.4f}" + "</b> → Current: <b>" + f"{td['current_rate']:.4f}" + "</b></p>" if td.get('reference_rate') is not None else "<p>No labels in current batch — target drift not calculated.</p>"}
+    """
+
+    # Concept drift section
+    cd = result.get("concept_drift", {})
+    cd_metrics = cd.get("metrics", {})
+    concept_rows = ""
+    if cd_metrics:
+        for key in ["precision", "recall", "f1", "roc_auc"]:
+            val = cd_metrics.get(key)
+            if val is not None:
+                concept_rows += f"<tr><td>{key.upper()}</td><td>{val:.4f}</td></tr>"
+    concept_html = f"""
+      <p>Status: {_status_badge(cd.get('status','?'))}&nbsp; F1 drop: <b>{"N/A" if cd.get('score') is None else f"{cd['score']:.4f}"}</b> / threshold {cd.get('threshold', 0.05)}</p>
+      {"<p>Baseline F1: <b>" + f"{cd['baseline_f1']:.4f}" + "</b></p>" if cd.get('baseline_f1') is not None else ""}
+      {"<table><thead><tr><th>Metric</th><th>Value on current batch</th></tr></thead><tbody>" + concept_rows + "</tbody></table>" if concept_rows else "<p>No labels in current batch — concept drift not calculated.</p>"}
+    """
+
+    overall_color = {"ok": "#27ae60", "drift": "#e74c3c", "not_enough_data": "#7f8c8d"}.get(result["status"], "#7f8c8d")
+    rows_info = result.get("rows", {})
+
     html = f"""<!doctype html>
-<html><head><meta charset="utf-8"><title>AML drift report</title>
-<style>body{{font-family:Arial,sans-serif;margin:32px;color:#17202a}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #d5d8dc;padding:8px}}th{{background:#f4f6f7}}</style></head>
-<body><h1>AML drift report</h1><p>Status: <b>{result['status']}</b></p>
-<p>Data drift score: {result['data_drift']['score']:.4f} / threshold {result['data_drift']['threshold']}</p>
-<p>Target drift: {result['target_drift']['status']}</p>
-<p>Concept drift: {result['concept_drift']['status']}</p>
-<h2>Raw feature metrics</h2><table><thead><tr><th>Feature</th><th>Kind</th><th>PSI</th><th>KS</th></tr></thead><tbody>{rows}</tbody></table>
+<html><head><meta charset="utf-8"><title>AML Drift Report — {stamp}</title>
+<style>
+  body{{font-family:Arial,sans-serif;margin:32px;color:#17202a;max-width:1100px}}
+  h1{{border-bottom:3px solid {overall_color};padding-bottom:8px}}
+  h2{{margin-top:32px;color:#2c3e50;border-left:4px solid #3498db;padding-left:10px}}
+  table{{border-collapse:collapse;width:100%;margin-top:10px}}
+  td,th{{border:1px solid #d5d8dc;padding:8px 12px}}
+  th{{background:#f4f6f7;font-weight:600}}
+  .card{{background:#fafafa;border:1px solid #e5e8ea;border-radius:6px;padding:16px 20px;margin-top:12px}}
+  .meta{{color:#7f8c8d;font-size:13px;margin-bottom:4px}}
+</style></head>
+<body>
+<h1>AML Drift Report</h1>
+<div class="card">
+  <p class="meta">Generated: {result.get('created_at','')} &nbsp;|&nbsp; Source: <b>{result.get('source','?')}</b></p>
+  <p class="meta">Rows — Reference: <b>{rows_info.get('reference','?')}</b> &nbsp;|&nbsp; Current: <b>{rows_info.get('current','?')}</b></p>
+  <p style="font-size:18px">Overall status: {_status_badge(result['status'])}</p>
+</div>
+
+<h2>Data Drift</h2>
+<div class="card">
+  <p>Score (max PSI): <b style="color:{_psi_color(result['data_drift']['score'])}">{result['data_drift']['score']:.4f}</b> / threshold {result['data_drift']['threshold']}
+  &nbsp;→&nbsp; {_status_badge("drift" if result['data_drift']['score'] >= result['data_drift']['threshold'] else "ok")}</p>
+  <p style="font-size:12px;color:#7f8c8d">PSI &lt; 0.1 = no drift &nbsp;|&nbsp; 0.1–0.2 = moderate &nbsp;|&nbsp; &gt; 0.2 = significant</p>
+  <table><thead><tr><th>Feature</th><th>Kind</th><th>PSI ↓</th><th>KS</th></tr></thead><tbody>{rows}</tbody></table>
+</div>
+
+<h2>Target Drift</h2>
+<div class="card">{target_html}</div>
+
+<h2>Concept Drift</h2>
+<div class="card">{concept_html}</div>
 </body></html>"""
     html_path.write_text(html, encoding="utf-8")
     return json_path, html_path

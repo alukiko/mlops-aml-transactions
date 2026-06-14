@@ -11,9 +11,32 @@ REQUEST_LATENCY = Histogram("aml_api_request_latency_seconds", "API request late
 PREDICTION_COUNT = Counter("aml_predictions_total", "Total predictions", ["predicted_class"])
 ANOMALY_RATE = Gauge("aml_anomaly_rate", "Last batch anomaly rate")
 AVERAGE_PROBABILITY = Gauge("aml_average_laundering_probability", "Last batch average laundering probability")
-DATA_DRIFT_SCORE = Gauge("aml_data_drift_score", "Latest data drift score")
-TARGET_DRIFT_SCORE = Gauge("aml_target_drift_score", "Latest target drift score")
-CONCEPT_DRIFT_SCORE = Gauge("aml_concept_drift_score", "Latest concept drift score")
+
+# Aggregate drift scores
+DATA_DRIFT_SCORE = Gauge("aml_data_drift_score", "Latest data drift score (max PSI across features)")
+TARGET_DRIFT_SCORE = Gauge("aml_target_drift_score", "Latest target drift score (|cur_rate - ref_rate|)")
+CONCEPT_DRIFT_SCORE = Gauge("aml_concept_drift_score", "Latest concept drift score (F1 drop vs baseline)")
+
+# Drift status: 1=ok, 2=drift, 0=not_enough_data/labels
+DATA_DRIFT_STATUS = Gauge("aml_data_drift_status", "Data drift status: 0=no_data 1=ok 2=drift")
+TARGET_DRIFT_STATUS = Gauge("aml_target_drift_status", "Target drift status: 0=no_labels 1=ok 2=drift")
+CONCEPT_DRIFT_STATUS = Gauge("aml_concept_drift_status", "Concept drift status: 0=no_labels 1=ok 2=drift")
+
+# Per-feature drift (label = feature name + kind)
+FEATURE_DRIFT_PSI = Gauge("aml_feature_drift_psi", "Per-feature PSI score", ["feature", "kind"])
+FEATURE_DRIFT_KS = Gauge("aml_feature_drift_ks", "Per-feature KS statistic (numeric only)", ["feature"])
+
+# Target drift detail
+TARGET_DRIFT_REF_RATE = Gauge("aml_target_drift_reference_rate", "Reference positive rate (laundering fraction)")
+TARGET_DRIFT_CUR_RATE = Gauge("aml_target_drift_current_rate", "Current positive rate (laundering fraction)")
+
+# Concept drift model metrics on current batch
+CONCEPT_DRIFT_PRECISION = Gauge("aml_concept_drift_precision", "Precision on last labelled batch")
+CONCEPT_DRIFT_RECALL = Gauge("aml_concept_drift_recall", "Recall on last labelled batch")
+CONCEPT_DRIFT_F1 = Gauge("aml_concept_drift_f1", "F1 on last labelled batch")
+CONCEPT_DRIFT_ROC_AUC = Gauge("aml_concept_drift_roc_auc", "ROC-AUC on last labelled batch")
+CONCEPT_DRIFT_BASELINE_F1 = Gauge("aml_concept_drift_baseline_f1", "Training baseline F1 for concept drift comparison")
+
 RETRAINING_STATUS = Gauge("aml_retraining_status", "Latest retraining status: queued=1 running=2 completed=3 failed=4")
 MODEL_ROC_AUC = Gauge("aml_model_roc_auc", "Current model ROC-AUC")
 MODEL_PR_AUC = Gauge("aml_model_pr_auc", "Current model average precision / PR-AUC")
@@ -49,14 +72,50 @@ def record_predictions(results: list[dict]) -> None:
     AVERAGE_PROBABILITY.set(sum(float(r["probability"]) for r in results) / len(results))
 
 
+_DRIFT_STATUS_MAP = {"ok": 1, "drift": 2, "not_enough_data": 0, "not_enough_labels": 0}
+
+
 def record_drift(result: dict) -> None:
-    DATA_DRIFT_SCORE.set(float(result["data_drift"]["score"]))
-    target_score = result.get("target_drift", {}).get("score")
-    concept_score = result.get("concept_drift", {}).get("score")
+    data_drift = result.get("data_drift", {})
+    DATA_DRIFT_SCORE.set(float(data_drift.get("score", 0.0)))
+    DATA_DRIFT_STATUS.set(_DRIFT_STATUS_MAP.get(result.get("status", ""), 0))
+
+    # Per-feature PSI and KS
+    for metric in data_drift.get("metrics", []):
+        feature = metric["feature"]
+        kind = metric["kind"]
+        FEATURE_DRIFT_PSI.labels(feature=feature, kind=kind).set(float(metric.get("psi", 0.0)))
+        if metric.get("ks") is not None:
+            FEATURE_DRIFT_KS.labels(feature=feature).set(float(metric["ks"]))
+
+    # Target drift
+    target_drift = result.get("target_drift", {})
+    target_score = target_drift.get("score")
+    TARGET_DRIFT_STATUS.set(_DRIFT_STATUS_MAP.get(target_drift.get("status", "not_enough_labels"), 0))
     if target_score is not None:
         TARGET_DRIFT_SCORE.set(float(target_score))
+    if target_drift.get("reference_rate") is not None:
+        TARGET_DRIFT_REF_RATE.set(float(target_drift["reference_rate"]))
+    if target_drift.get("current_rate") is not None:
+        TARGET_DRIFT_CUR_RATE.set(float(target_drift["current_rate"]))
+
+    # Concept drift
+    concept_drift = result.get("concept_drift", {})
+    concept_score = concept_drift.get("score")
+    CONCEPT_DRIFT_STATUS.set(_DRIFT_STATUS_MAP.get(concept_drift.get("status", "not_enough_labels"), 0))
     if concept_score is not None:
         CONCEPT_DRIFT_SCORE.set(float(concept_score))
+    if concept_drift.get("baseline_f1") is not None:
+        CONCEPT_DRIFT_BASELINE_F1.set(float(concept_drift["baseline_f1"]))
+    for key, gauge in [
+        ("precision", CONCEPT_DRIFT_PRECISION),
+        ("recall", CONCEPT_DRIFT_RECALL),
+        ("f1", CONCEPT_DRIFT_F1),
+        ("roc_auc", CONCEPT_DRIFT_ROC_AUC),
+    ]:
+        val = concept_drift.get("metrics", {}).get(key)
+        if val is not None:
+            gauge.set(float(val))
 
 
 def record_retraining_status(status: str) -> None:

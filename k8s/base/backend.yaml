@@ -13,21 +13,73 @@ spec:
       labels:
         app: aml-backend
     spec:
-      containers:
-        - name: backend
+      initContainers:
+        - name: sync-data
           image: ghcr.io/alukiko/mlops-aml-transactions/aml-backend:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /shared/runtime /shared/reports /shared/mlartifacts /shared/models
+              cp -f /app/models/* /shared/models/ 2>/dev/null || true
+              if [ -n "$AWS_ACCESS_KEY_ID" ] && [ "$AWS_ACCESS_KEY_ID" != "replace-me" ]; then
+                python -m aml_monitoring.s3_data download --required
+                rm -f /app/models/*.pkl
+                python -m aml_monitoring.s3_data models-download --required
+                cp -f /app/models/* /shared/models/
+              else
+                echo "S3 credentials are not configured; using image model artifacts"
+              fi
           envFrom:
             - configMapRef:
                 name: aml-config
+            - secretRef:
+                name: aml-secrets
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+            - name: runtime
+              mountPath: /shared
+      containers:
+        - name: backend
+          image: ghcr.io/alukiko/mlops-aml-transactions/aml-backend:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: aml-config
+            - secretRef:
+                name: aml-secrets
           ports:
             - containerPort: 8000
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+            - name: runtime
+              mountPath: /app/runtime
+              subPath: runtime
+            - name: runtime
+              mountPath: /app/reports
+              subPath: reports
+            - name: runtime
+              mountPath: /app/mlartifacts
+              subPath: mlartifacts
+            - name: runtime
+              mountPath: /app/models
+              subPath: models
           readinessProbe:
             httpGet:
               path: /health
               port: 8000
             initialDelaySeconds: 10
             periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: aml-data-pvc
+        - name: runtime
+          persistentVolumeClaim:
+            claimName: aml-runtime-pvc
 ---
 apiVersion: v1
 kind: Service
