@@ -3,8 +3,10 @@ import contextlib
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
-from .config import DRIFT_MIN_ROWS, DRIFT_PREDICTION_LIMIT, DRIFT_SCHEDULER_ENABLED, DRIFT_SCHEDULER_INTERVAL_SECONDS
+from .config import DRIFT_MIN_ROWS, DRIFT_PREDICTION_LIMIT, DRIFT_SCHEDULER_ENABLED, DRIFT_SCHEDULER_INTERVAL_SECONDS, REPORT_DIR
 from .drift import run_drift
 from .experiments import list_experiments
 from .inference import get_model_service
@@ -61,6 +63,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="AML Monitoring API", version="1.0.0", lifespan=lifespan)
+
+REPORT_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/reports/drift", StaticFiles(directory=str(REPORT_DIR)), name="drift-reports")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -110,6 +116,20 @@ def drift_status() -> dict:
 @app.get("/drift/reports")
 def drift_reports(limit: int = 50) -> dict:
     return {"items": store.drift_runs(limit)}
+
+
+@app.get("/drift/report/{report_id}", response_class=HTMLResponse)
+def drift_report_html(report_id: int):
+    runs = store.drift_runs(200)
+    run = next((r for r in runs if r["id"] == report_id), None)
+    if not run:
+        raise HTTPException(status_code=404, detail="Report not found")
+    html_path = run.get("report_html", "")
+    from pathlib import Path
+    path = Path(html_path)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Report file not found on disk")
+    return FileResponse(path, media_type="text/html")
 
 
 @app.post("/drift/run")
