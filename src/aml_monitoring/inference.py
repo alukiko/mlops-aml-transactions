@@ -16,7 +16,7 @@ class ModelService:
         if isinstance(raw, dict):
             self.model = raw["pipeline"]
             self.threshold = float(raw.get("threshold", DEFAULT_THRESHOLD))
-            self.meta: dict = {}
+            self.meta: dict = {"metrics": raw.get("metrics", {})}
         else:
             self.model = raw
             self.meta = joblib.load(MODEL_META_PATH) if MODEL_META_PATH.exists() else {}
