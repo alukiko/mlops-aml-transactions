@@ -1,0 +1,80 @@
+schema: '2.0'
+stages:
+  prepare_data:
+    cmd: python -c "import sys; sys.path.insert(0, 'src'); from 
+      aml_monitoring.s3_data import main; main()" download --required
+    deps:
+    - path: src/aml_monitoring/config.py
+      hash: md5
+      md5: 4e55f0363c77e293bb621b0319e5f370
+      size: 2443
+    - path: src/aml_monitoring/s3_data.py
+      hash: md5
+      md5: 01889bc28f90e7a581f9c7e067336c08
+      size: 5388
+    outs:
+    - path: data/HI-Small_Trans.csv
+      hash: md5
+      md5: 9667f3a6323e6ad88e699acf42db9157
+      size: 475664283
+    - path: data/LI-Small_Trans.csv
+      hash: md5
+      md5: c4f75074f5456972fc66859ddbe58fda
+      size: 650422357
+  retrain:
+    cmd: python -c "import sys; sys.path.insert(0, 'src'); from 
+      aml_monitoring.cli import main; main()" retrain
+    deps:
+    - path: data/HI-Small_Trans.csv
+      hash: md5
+      md5: 9667f3a6323e6ad88e699acf42db9157
+      size: 475664283
+    - path: data/LI-Small_Trans.csv
+      hash: md5
+      md5: c4f75074f5456972fc66859ddbe58fda
+      size: 650422357
+    - path: src/aml_monitoring
+      hash: md5
+      md5: 8f1ade5fe86e04fc0edf1d8ffc6ef64c.dir
+      size: 238990
+      nfiles: 35
+    outs:
+    - path: models/hgb_compat.pkl
+      hash: md5
+      md5: 192a2a7268318fd2fe0017c4f4ab12c0
+      size: 3343187
+    - path: models/model_meta.pkl
+      hash: md5
+      md5: ebb280b4ab671e924250ba18fa6c92ba
+      size: 5872625
+  drift_report:
+    cmd: python -c "import sys; sys.path.insert(0, 'src'); from 
+      aml_monitoring.cli import main; main()" drift
+    deps:
+    - path: data/HI-Small_Trans.csv
+      hash: md5
+      md5: 9667f3a6323e6ad88e699acf42db9157
+      size: 475664283
+    - path: data/LI-Small_Trans.csv
+      hash: md5
+      md5: c4f75074f5456972fc66859ddbe58fda
+      size: 650422357
+    - path: models/hgb_compat.pkl
+      hash: md5
+      md5: 192a2a7268318fd2fe0017c4f4ab12c0
+      size: 3343187
+    - path: models/model_meta.pkl
+      hash: md5
+      md5: ebb280b4ab671e924250ba18fa6c92ba
+      size: 5872625
+    - path: src/aml_monitoring
+      hash: md5
+      md5: 8f1ade5fe86e04fc0edf1d8ffc6ef64c.dir
+      size: 238990
+      nfiles: 35
+    outs:
+    - path: reports/drift
+      hash: md5
+      md5: b339ad473a20434fd23b6edcdd10669a.dir
+      size: 7390753
+      nfiles: 1350

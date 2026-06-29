@@ -17,7 +17,10 @@ def main() -> None:
     if args.command == "retrain":
         job_id = store.create_retraining_job()
         run_retraining(job_id, store)
-        print(store.retraining_jobs(1)[0])
+        job = store.retraining_jobs(1)[0]
+        print(job)
+        if job["status"] == "failed":
+            raise SystemExit(1)
 
 
 if __name__ == "__main__":

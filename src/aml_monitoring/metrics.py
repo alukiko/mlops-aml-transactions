@@ -78,7 +78,7 @@ _DRIFT_STATUS_MAP = {"ok": 1, "drift": 2, "not_enough_data": 0, "not_enough_labe
 def record_drift(result: dict) -> None:
     data_drift = result.get("data_drift", {})
     DATA_DRIFT_SCORE.set(float(data_drift.get("score", 0.0)))
-    DATA_DRIFT_STATUS.set(_DRIFT_STATUS_MAP.get(result.get("status", ""), 0))
+    DATA_DRIFT_STATUS.set(_DRIFT_STATUS_MAP.get(data_drift.get("status", result.get("status", "")), 0))
 
     # Per-feature PSI and KS
     for metric in data_drift.get("metrics", []):

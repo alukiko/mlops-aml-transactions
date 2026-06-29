@@ -62,18 +62,31 @@ def download_models(required: bool = False) -> list[Path]:
     return _download_files(MODEL_FILES, S3_MODELS_PREFIX, required=required)
 
 
-def upload_data(required: bool = True) -> list[str]:
+def _upload_files(files: list[Path], prefix: str, required: bool = True) -> list[str]:
     uploaded = []
     client = _client()
-    for path in DATA_FILES:
+    for path in files:
         if not path.exists():
             if required:
                 raise FileNotFoundError(f"Local data file is missing: {path}")
             continue
-        key = s3_key_for(path, S3_DATA_PREFIX)
-        client.upload_file(str(path), S3_BUCKET, key)
+        key = s3_key_for(path, prefix)
+        try:
+            client.upload_file(str(path), S3_BUCKET, key)
+        except (BotoCoreError, ClientError, NoCredentialsError):
+            if required:
+                raise
+            continue
         uploaded.append(f"s3://{S3_BUCKET}/{key}")
     return uploaded
+
+
+def upload_data(required: bool = True) -> list[str]:
+    return _upload_files(DATA_FILES, S3_DATA_PREFIX, required=required)
+
+
+def upload_models(required: bool = True) -> list[str]:
+    return _upload_files(MODEL_FILES, S3_MODELS_PREFIX, required=required)
 
 
 def describe_s3_error(exc: Exception) -> str:
@@ -113,7 +126,7 @@ def ensure_data_available(required: bool = False) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Upload/download AML files to an S3-compatible bucket.")
-    parser.add_argument("command", choices=["download", "upload", "check", "models-download"])
+    parser.add_argument("command", choices=["download", "upload", "check", "models-download", "models-upload"])
     parser.add_argument("--required", action="store_true")
     args = parser.parse_args()
 
@@ -123,6 +136,9 @@ def main() -> None:
     elif args.command == "models-download":
         paths = download_models(required=args.required)
         print("\n".join(str(p) for p in paths) or "No files downloaded")
+    elif args.command == "models-upload":
+        keys = upload_models(required=args.required)
+        print("\n".join(keys) or "No files uploaded")
     elif args.command == "upload":
         keys = upload_data(required=args.required)
         print("\n".join(keys) or "No files uploaded")

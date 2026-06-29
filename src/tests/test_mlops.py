@@ -1,7 +1,7 @@
 import pandas as pd
 
 from aml_monitoring.data import normalize_transactions
-from aml_monitoring.drift import categorical_psi, ks_statistic, psi, run_drift
+from aml_monitoring.drift import STABLE_ENGINEERED_FEATURES, categorical_psi, ks_statistic, psi, run_drift
 from aml_monitoring.features import FEATURE_COLS, build_preprocessor, engineer_features, to_feature_matrix
 from aml_monitoring.retraining import find_best_threshold, load_stratified_training_sample
 
@@ -98,6 +98,49 @@ def test_drift_scores_increase_for_shifted_samples():
     actual = pd.Series([100, 110, 120, 130, 140])
     assert psi(expected, actual) > 0.1
     assert ks_statistic(expected, actual) > 0.5
+
+
+def test_psi_counts_values_outside_reference_range():
+    expected = pd.Series(range(100))
+    actual = pd.Series([-1000] * 50 + [1000] * 50)
+    assert psi(expected, actual) > 0.2
+
+
+def test_drift_uses_only_comparable_engineered_features(monkeypatch, tmp_path):
+    reference = pd.concat([sample_frame()] * 20, ignore_index=True)
+    monkeypatch.setattr("aml_monitoring.drift.get_reference", lambda: reference)
+    monkeypatch.setattr("aml_monitoring.drift.write_report", lambda result: (tmp_path / "drift.json", tmp_path / "drift.html"))
+
+    result = run_drift(batch=reference.to_dict(orient="records"), min_rows=2)
+    feature_names = {metric["feature"] for metric in result["data_drift"]["feature_metrics"]}
+
+    assert feature_names == set(STABLE_ENGINEERED_FEATURES)
+    assert not any(name.endswith("_enc") for name in feature_names)
+    assert not any(name.startswith(("sender_", "recv_")) for name in feature_names)
+
+
+def test_concept_drift_ignores_unlabelled_rows(monkeypatch, tmp_path):
+    reference = pd.concat([sample_frame()] * 20, ignore_index=True)
+    current = pd.concat([sample_frame()] * 11, ignore_index=True)
+    current = pd.concat([current, sample_frame().iloc[[0]].assign(**{"Is Laundering": None})], ignore_index=True)
+    captured = {}
+
+    class StubService:
+        threshold = 0.5
+        meta = {"metrics": {"f1": 0.8}}
+
+        def predict(self, records):
+            captured["rows"] = len(records)
+            return [{"probability": 0.9 if index % 2 else 0.1} for index, _ in enumerate(records)]
+
+    monkeypatch.setattr("aml_monitoring.drift.get_reference", lambda: reference)
+    monkeypatch.setattr("aml_monitoring.drift.get_model_service", lambda: StubService())
+    monkeypatch.setattr("aml_monitoring.drift.write_report", lambda result: (tmp_path / "drift.json", tmp_path / "drift.html"))
+
+    result = run_drift(batch=current.to_dict(orient="records"), min_rows=2)
+
+    assert captured["rows"] == 22
+    assert result["concept_drift"]["status"] in {"ok", "drift"}
 
 
 def test_drift_returns_not_enough_data_for_small_recent_batch(monkeypatch, tmp_path):
