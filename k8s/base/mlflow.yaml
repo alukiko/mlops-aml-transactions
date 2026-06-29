@@ -33,6 +33,17 @@ spec:
                 name: aml-config
           ports:
             - containerPort: 5000
+          volumeMounts:
+            - mountPath: /app/runtime
+              name: runtime
+              subPath: runtime
+            - mountPath: /app/mlartifacts
+              name: runtime
+              subPath: mlartifacts
+      volumes:
+        - name: runtime
+          persistentVolumeClaim:
+            claimName: aml-runtime-pvc
 ---
 apiVersion: v1
 kind: Service

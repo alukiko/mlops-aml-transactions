@@ -140,6 +140,10 @@ def run_retraining(job_id: int, store: Store) -> None:
         preprocessor = build_preprocessor(train_df)
         x_train = to_feature_matrix(train_df, preprocessor=preprocessor)
         x_val = to_feature_matrix(val_df, preprocessor=preprocessor)
+        categorical_cols = x_train.select_dtypes(include="object").columns.tolist()
+        for col in categorical_cols:
+            x_train[col] = x_train[col].astype("category")
+            x_val[col] = pd.Categorical(x_val[col], categories=x_train[col].cat.categories)
         pos = max(int(y_train.sum()), 1)
         neg = max(len(y_train) - pos, 1)
         model = lgb.LGBMClassifier(

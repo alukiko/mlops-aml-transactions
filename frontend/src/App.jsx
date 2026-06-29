@@ -108,49 +108,91 @@ function RecentPredictions({ items }) {
   );
 }
 
+function dataDriftStatus(dd) {
+  if (!dd) return "unknown";
+  return dd.score != null && dd.score > (dd.threshold ?? 0.2) ? "drift" : "ok";
+}
+
 function Drift({ runs, onRefresh }) {
   const [running, setRunning] = useState(false);
   async function run() {
     setRunning(true);
     try {
-      await api("/drift/run", { method: "POST", body: JSON.stringify({}) });
+      await api("/drift/run", { method: "POST", body: JSON.stringify({ use_recent_predictions: false }) });
       onRefresh();
     } finally {
       setRunning(false);
     }
   }
   const latest = runs[0];
+  const details = latest?.details;
+
   return (
     <section className="panel">
       <div className="panel-header">
         <h2>Drift Alerts</h2>
         <button onClick={run} disabled={running}><Activity size={16} /> {running ? "Running" : "Run drift"}</button>
       </div>
+
       {latest ? (
-        <div className="alert-line">
-          <AlertTriangle size={18} />
-          <span>Latest status</span>
-          <StatusPill value={latest.status} />
-          <span>score {Number(latest.score || 0).toFixed(4)}</span>
-          <span>rows {latest.details?.rows?.current ?? "-"}</span>
-          <span>{latest.details?.source || "unknown source"}</span>
-        </div>
+        <>
+          <div className="drift-cards">
+            <div className="drift-card">
+              <span className="drift-card-label">Data Drift</span>
+              <StatusPill value={dataDriftStatus(details?.data_drift)} />
+              <span className="drift-card-score">PSI {details?.data_drift?.score?.toFixed(3) ?? "—"} / threshold {details?.data_drift?.threshold ?? 0.2}</span>
+            </div>
+            <div className="drift-card">
+              <span className="drift-card-label">Target Drift</span>
+              <StatusPill value={details?.target_drift?.status ?? "unknown"} />
+              <span className="drift-card-score">score {details?.target_drift?.score?.toFixed(4) ?? "—"} / threshold {details?.target_drift?.threshold ?? 0.02}</span>
+            </div>
+            <div className="drift-card">
+              <span className="drift-card-label">Concept Drift</span>
+              <StatusPill value={details?.concept_drift?.status ?? "unknown"} />
+              <span className="drift-card-score">F1-drop {details?.concept_drift?.score?.toFixed(4) ?? "—"} / threshold {details?.concept_drift?.threshold ?? 0.05}</span>
+            </div>
+          </div>
+
+          <div className="alert-line">
+            <AlertTriangle size={18} />
+            <span>Combined</span>
+            <StatusPill value={latest.status} />
+            <span>score {Number(latest.score || 0).toFixed(4)}</span>
+            <span>rows current {details?.rows?.current ?? "—"} / ref {details?.rows?.reference ?? "—"}</span>
+            <span>{details?.source || "unknown source"}</span>
+          </div>
+        </>
       ) : <div className="empty">No drift reports yet</div>}
+
       <div className="table-wrap compact">
         <table>
-          <thead><tr><th>ID</th><th>Created</th><th>Status</th><th>Score</th><th>Rows</th><th>Source</th><th>Report</th></tr></thead>
+          <thead>
+            <tr>
+              <th>ID</th><th>Created</th><th>Combined</th>
+              <th>Data Drift</th><th>Target Drift</th><th>Concept Drift</th>
+              <th>Rows</th><th>Report</th>
+            </tr>
+          </thead>
           <tbody>
-            {runs.map((run) => (
-              <tr key={run.id}>
-                <td>{run.id}</td>
-                <td>{run.created_at}</td>
-                <td><StatusPill value={run.status} /></td>
-                <td>{Number(run.score || 0).toFixed(4)}</td>
-                <td>{run.details?.rows?.current ?? "-"}</td>
-                <td>{run.details?.source || "-"}</td>
-                <td>{run.report_html || run.report_json || "-"}</td>
-              </tr>
-            ))}
+            {runs.map((run) => {
+              const d = run.details;
+              return (
+                <tr key={run.id}>
+                  <td>{run.id}</td>
+                  <td>{run.created_at}</td>
+                  <td><StatusPill value={run.status} /></td>
+                  <td>
+                    <StatusPill value={dataDriftStatus(d?.data_drift)} />
+                    {" "}{d?.data_drift?.score?.toFixed(2) ?? "—"}
+                  </td>
+                  <td><StatusPill value={d?.target_drift?.status ?? "unknown"} /></td>
+                  <td><StatusPill value={d?.concept_drift?.status ?? "unknown"} /></td>
+                  <td>{d?.rows?.current ?? "—"}</td>
+                  <td>{run.report_html || run.report_json || "—"}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
