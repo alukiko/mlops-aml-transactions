@@ -216,7 +216,7 @@ pytest src/tests tests
 | `secret.yaml` | S3 credentials → envFrom в backend |
 | `configmap.yaml` | Переменные окружения |
 | `drift-cronjob.yaml` | CronJob drift-check (каждые 15 мин) |
-| `retraining-job.yaml` | Job для ручного переобучения |
+| `retraining-job.yaml` | Опциональный шаблон Job; Argo CD его не применяет, UI запускает `/retrain` через FastAPI |
 | `prometheus-grafana.yaml` | Prometheus + Grafana |
 
 Деплой через Argo CD (уже настроен):
