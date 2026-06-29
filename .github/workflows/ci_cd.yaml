@@ -109,7 +109,7 @@ jobs:
             sed -i "s|${FRONTEND_IMAGE}:[a-zA-Z0-9._-]*|${FRONTEND_IMAGE}:${{ github.sha }}|g" {} +
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
-          git add k8s/base/backend.yaml k8s/base/frontend.yaml
+          git add k8s/base/*.yaml
           git diff --staged --quiet || git commit -m "ci: update image tags to ${{ github.sha }} [skip ci]"
           git push
 
