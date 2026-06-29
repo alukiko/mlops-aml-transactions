@@ -103,8 +103,10 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Update image tags in k8s manifests
         run: |
-          sed -i "s|aml-backend:[a-zA-Z0-9._-]*|aml-backend:${{ github.sha }}|g" k8s/base/backend.yaml
-          sed -i "s|aml-frontend:[a-zA-Z0-9._-]*|aml-frontend:${{ github.sha }}|g" k8s/base/frontend.yaml
+          find k8s/base -type f -name '*.yaml' -exec \
+            sed -i "s|${BACKEND_IMAGE}:[a-zA-Z0-9._-]*|${BACKEND_IMAGE}:${{ github.sha }}|g" {} +
+          find k8s/base -type f -name '*.yaml' -exec \
+            sed -i "s|${FRONTEND_IMAGE}:[a-zA-Z0-9._-]*|${FRONTEND_IMAGE}:${{ github.sha }}|g" {} +
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
           git add k8s/base/backend.yaml k8s/base/frontend.yaml
