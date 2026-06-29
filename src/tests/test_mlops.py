@@ -1,5 +1,6 @@
 import pandas as pd
 
+import aml_monitoring.s3_data as s3_data
 from aml_monitoring.config import TARGET
 from aml_monitoring.data import normalize_transactions
 from aml_monitoring.drift import STABLE_ENGINEERED_FEATURES, categorical_psi, ks_statistic, psi, run_drift
@@ -38,6 +39,23 @@ def sample_frame():
             },
         ]
     )
+
+
+def test_model_download_requires_model_but_not_metadata(monkeypatch):
+    calls = []
+
+    def fake_download(files, prefix, required=False):
+        calls.append((files, prefix, required))
+        return []
+
+    monkeypatch.setattr(s3_data, "_download_files", fake_download)
+
+    s3_data.download_models(required=True)
+
+    assert calls == [
+        ([s3_data.MODEL_PATH], s3_data.S3_MODELS_PREFIX, True),
+        ([s3_data.MODEL_META_PATH], s3_data.S3_MODELS_PREFIX, False),
+    ]
 
 
 def test_engineer_features_creates_model_columns():
