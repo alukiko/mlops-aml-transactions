@@ -1,0 +1,4 @@
+-r requirements.txt
+
+cookiecutter>=2.6,<3
+dvc[s3]>=3.60,<4

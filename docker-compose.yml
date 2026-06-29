@@ -19,6 +19,7 @@ services:
       - ./models:/app/models
       - ./data:/app/data:ro
       - ./mlartifacts:/app/mlartifacts
+      - ./mlruns:/app/mlruns
     ports:
       - "8000:8000"
     networks:
@@ -45,6 +46,7 @@ services:
       - ./runtime:/app/runtime
       - ./data:/app/data:ro
       - ./mlartifacts:/app/mlartifacts
+      - ./mlruns:/app/mlruns
     ports:
       - "5000:5000"
 

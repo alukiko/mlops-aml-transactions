@@ -1,0 +1,34 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mlflow-db-upgrade
+  namespace: aml-monitoring
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: mlflow-db-upgrade
+          image: ghcr.io/alukiko/mlops-aml-transactions/aml-backend:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - mlflow
+            - db
+            - upgrade
+            - sqlite:////app/runtime/mlflow.db
+          envFrom:
+            - configMapRef:
+                name: aml-config
+          volumeMounts:
+            - mountPath: /app/runtime
+              name: runtime
+              subPath: runtime
+      volumes:
+        - name: runtime
+          persistentVolumeClaim:
+            claimName: aml-runtime-pvc
+  backoffLimit: 2

@@ -9,3 +9,4 @@ resources:
   - prometheus-grafana.yaml
   - retraining-job.yaml
   - drift-cronjob.yaml
+  - mlflow-db-upgrade-job.yaml

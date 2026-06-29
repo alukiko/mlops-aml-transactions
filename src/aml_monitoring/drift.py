@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import f1_score, precision_score, recall_score, roc_auc_score
 
-from .config import DATA_FILES, FEATURE_COLS, MODEL_META_PATH, REFERENCE_SAMPLE_PATH, REPORT_DIR, TARGET
+from .config import DATA_FILES, MODEL_META_PATH, REFERENCE_SAMPLE_PATH, REPORT_DIR, TARGET
 from .data import load_transactions, sample_reference
 from .features import engineer_features
 from .inference import get_model_service
@@ -15,6 +15,21 @@ from .inference import get_model_service
 
 NUMERIC_RAW = ["Amount Received", "Amount Paid"]
 CATEGORICAL_RAW = ["Receiving Currency", "Payment Currency", "Payment Format", "From Bank", "To Bank"]
+STABLE_ENGINEERED_FEATURES = [
+    "hour",
+    "day_of_week",
+    "day_of_month",
+    "is_weekend",
+    "is_night",
+    "amount_ratio",
+    "amount_diff",
+    "log_amount_paid",
+    "log_amount_recv",
+    "is_round_amount",
+    "currency_mismatch",
+    "same_bank",
+    "self_transfer",
+]
 
 
 def psi(expected: pd.Series, actual: pd.Series, buckets: int = 10) -> float:
@@ -22,11 +37,10 @@ def psi(expected: pd.Series, actual: pd.Series, buckets: int = 10) -> float:
     actual = pd.to_numeric(actual, errors="coerce").dropna()
     if len(expected) < 2 or len(actual) < 2:
         return 0.0
-    quantiles = np.unique(np.quantile(expected, np.linspace(0, 1, buckets + 1)))
-    if len(quantiles) < 3:
-        quantiles = np.linspace(float(expected.min()), float(expected.max()) + 1e-9, buckets + 1)
-    expected_counts = np.histogram(expected, bins=quantiles)[0] / max(len(expected), 1)
-    actual_counts = np.histogram(actual, bins=quantiles)[0] / max(len(actual), 1)
+    interior_edges = np.unique(np.quantile(expected, np.linspace(0, 1, buckets + 1))[1:-1])
+    bins = np.concatenate(([-np.inf], interior_edges, [np.inf]))
+    expected_counts = np.histogram(expected, bins=bins)[0] / max(len(expected), 1)
+    actual_counts = np.histogram(actual, bins=bins)[0] / max(len(actual), 1)
     expected_counts = np.clip(expected_counts, 1e-6, None)
     actual_counts = np.clip(actual_counts, 1e-6, None)
     return float(np.sum((actual_counts - expected_counts) * np.log(actual_counts / expected_counts)))
@@ -81,7 +95,7 @@ def run_drift(
             "created_at": datetime.now(timezone.utc).isoformat(),
             "status": "not_enough_data",
             "source": source,
-            "data_drift": {"score": 0.0, "threshold": 0.2, "metrics": [], "feature_metrics": []},
+            "data_drift": {"status": "not_enough_data", "score": 0.0, "threshold": 0.2, "metrics": [], "feature_metrics": []},
             "target_drift": {"status": "not_enough_labels", "score": None, "threshold": 0.02},
             "concept_drift": {"status": "not_enough_labels", "metrics": {}, "threshold": 0.05},
             "rows": {"reference": len(reference), "current": len(current), "min_required": min_rows},
@@ -116,7 +130,7 @@ def run_drift(
 
     feature_metrics = [
         {"feature": column, "kind": "model_feature", "psi": psi(reference_features[column], current_features[column]), "ks": ks_statistic(reference_features[column], current_features[column])}
-        for column in FEATURE_COLS
+        for column in STABLE_ENGINEERED_FEATURES
         if column in reference_features.columns and column in current_features.columns
     ]
 
@@ -132,9 +146,11 @@ def run_drift(
         score = abs(cur_rate - ref_rate)
         target_drift = {"status": "drift" if score >= 0.02 else "ok", "score": score, "reference_rate": ref_rate, "current_rate": cur_rate, "threshold": 0.02}
 
+        label_mask = current_features[TARGET].notna()
+        labelled_current = current.loc[label_mask].copy()
         service = get_model_service()
-        probabilities = [row["probability"] for row in service.predict(current.to_dict(orient="records"))]
-        y_true = current_features[TARGET].fillna(0).astype(int).to_numpy()
+        probabilities = [row["probability"] for row in service.predict(labelled_current.to_dict(orient="records"))]
+        y_true = current_features.loc[label_mask, TARGET].astype(int).to_numpy()
         y_pred = (np.array(probabilities) >= service.threshold).astype(int)
         metrics = {
             "precision": float(precision_score(y_true, y_pred, zero_division=0)),
@@ -143,12 +159,12 @@ def run_drift(
         }
         if len(set(y_true)) > 1:
             metrics["roc_auc"] = float(roc_auc_score(y_true, probabilities))
-        baseline = {}
-        if MODEL_META_PATH.exists():
+        baseline = service.meta.get("metrics", {})
+        if not baseline and MODEL_META_PATH.exists():
             import joblib
 
             baseline = joblib.load(MODEL_META_PATH).get("metrics", {})
-        baseline_f1 = float(baseline.get("oof_f1", metrics["f1"]))
+        baseline_f1 = float(baseline.get("oof_f1", baseline.get("f1", metrics["f1"])))
         f1_drop = max(0.0, baseline_f1 - metrics["f1"])
         concept_drift = {"status": "drift" if f1_drop >= 0.05 else "ok", "metrics": metrics, "baseline_f1": baseline_f1, "score": f1_drop, "threshold": 0.05}
 
@@ -156,7 +172,13 @@ def run_drift(
         "created_at": datetime.now(timezone.utc).isoformat(),
         "status": "drift" if data_drift_score >= data_drift_threshold or target_drift.get("status") == "drift" or concept_drift.get("status") == "drift" else "ok",
         "source": source,
-        "data_drift": {"score": data_drift_score, "threshold": data_drift_threshold, "metrics": data_metrics, "feature_metrics": feature_metrics},
+        "data_drift": {
+            "status": "drift" if data_drift_score >= data_drift_threshold else "ok",
+            "score": data_drift_score,
+            "threshold": data_drift_threshold,
+            "metrics": data_metrics,
+            "feature_metrics": feature_metrics,
+        },
         "target_drift": target_drift,
         "concept_drift": concept_drift,
         "rows": {"reference": len(reference), "current": len(current)},

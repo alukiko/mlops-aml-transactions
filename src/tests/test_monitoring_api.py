@@ -99,3 +99,32 @@ def test_drift_run_uses_recent_predictions_by_default(monkeypatch):
     assert captured["batch"] == [{"Amount Paid": 100.0}]
     assert captured["source"] == "recent_predictions"
     assert captured["stored"] is True
+
+
+def test_drift_run_uses_dataset_when_recent_predictions_are_disabled(monkeypatch):
+    captured = {}
+
+    class StubStore:
+        def add_drift_run(self, *args):
+            return 1
+
+    def fake_run_drift(batch=None, batch_path=None, min_rows=1, source="dataset"):
+        captured["batch"] = batch
+        captured["source"] = source
+        return {
+            "status": "ok",
+            "data_drift": {"status": "ok", "score": 0.0, "threshold": 0.2},
+            "report_json": "report.json",
+            "report_html": "report.html",
+        }
+
+    monkeypatch.setattr(main, "store", StubStore())
+    monkeypatch.setattr(main, "run_drift", fake_run_drift)
+    monkeypatch.setattr(main, "record_drift", lambda result: None)
+
+    client = TestClient(main.app)
+    response = client.post("/drift/run", json={"use_recent_predictions": False})
+
+    assert response.status_code == 200
+    assert captured["batch"] is None
+    assert captured["source"] == "dataset"

@@ -14,4 +14,25 @@ spec:
           envFrom:
             - configMapRef:
                 name: aml-config
+            - secretRef:
+                name: aml-secrets
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+            - name: runtime
+              mountPath: /app/runtime
+              subPath: runtime
+            - name: runtime
+              mountPath: /app/mlartifacts
+              subPath: mlartifacts
+            - name: runtime
+              mountPath: /app/models
+              subPath: models
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: aml-data-pvc
+        - name: runtime
+          persistentVolumeClaim:
+            claimName: aml-runtime-pvc
   backoffLimit: 1

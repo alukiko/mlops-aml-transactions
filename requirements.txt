@@ -8,7 +8,7 @@ fastapi
 uvicorn[standard]
 pydantic
 prometheus-client
-mlflow
+mlflow==3.14.0
 lightgbm
 ibm_watson_machine_learning
 pyyaml

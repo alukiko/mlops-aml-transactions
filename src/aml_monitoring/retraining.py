@@ -7,10 +7,20 @@ import pandas as pd
 from sklearn.metrics import average_precision_score, f1_score, precision_score, recall_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 
-from .config import DATA_FILES, DEFAULT_MLFLOW_TRACKING_URI, MODEL_DIR, RAW_COLUMNS, RUNTIME_DIR, TARGET
+from .config import (
+    DATA_FILES,
+    DEFAULT_MLFLOW_TRACKING_URI,
+    MODEL_DIR,
+    MODEL_PATH,
+    RAW_COLUMNS,
+    REFERENCE_SAMPLE_PATH,
+    RUNTIME_DIR,
+    TARGET,
+)
 from .data import get_env_int, normalize_transactions
 from .features import build_preprocessor, to_feature_matrix
 from .metrics import record_model_metrics, record_retraining_status
+from .s3_data import s3_credentials_configured, upload_models
 from .storage import Store
 
 
@@ -140,6 +150,10 @@ def run_retraining(job_id: int, store: Store) -> None:
         preprocessor = build_preprocessor(train_df)
         x_train = to_feature_matrix(train_df, preprocessor=preprocessor)
         x_val = to_feature_matrix(val_df, preprocessor=preprocessor)
+        categorical_cols = x_train.select_dtypes(include="object").columns.tolist()
+        for col in categorical_cols:
+            x_train[col] = x_train[col].astype("category")
+            x_val[col] = pd.Categorical(x_val[col], categories=x_train[col].cat.categories)
         pos = max(int(y_train.sum()), 1)
         neg = max(len(y_train) - pos, 1)
         model = lgb.LGBMClassifier(
@@ -209,16 +223,21 @@ def run_retraining(job_id: int, store: Store) -> None:
             mlflow.log_artifact(str(candidate_model_path))
             mlflow.log_artifact(str(candidate_meta_path))
             if accepted:
-                model_path = MODEL_DIR / "aml_lgbm.pkl"
+                model_path = MODEL_PATH
                 meta_path = MODEL_DIR / "model_meta.pkl"
                 joblib.dump(model, model_path)
                 joblib.dump(meta, meta_path)
+                reference = data.sample(n=min(50000, len(data)), random_state=42)
+                REFERENCE_SAMPLE_PATH.parent.mkdir(parents=True, exist_ok=True)
+                reference.to_csv(REFERENCE_SAMPLE_PATH, index=False)
                 from .inference import get_model_service
 
                 get_model_service.cache_clear()
                 record_model_metrics(meta["metrics"], threshold)
                 mlflow.log_artifact(str(model_path))
                 mlflow.log_artifact(str(meta_path))
+                if s3_credentials_configured():
+                    upload_models(required=False)
             metrics["registered_model_name"] = registered_model_name
             metrics["accepted"] = accepted
             metrics["baseline_f2"] = baseline.get("f2", 0.0)

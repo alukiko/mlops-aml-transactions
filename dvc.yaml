@@ -15,14 +15,14 @@ stages:
       - data/LI-Small_Trans.csv
       - src/aml_monitoring
     outs:
-      - models/aml_lgbm.pkl
+      - models/hgb_compat.pkl
       - models/model_meta.pkl
   drift_report:
     cmd: python -c "import sys; sys.path.insert(0, 'src'); from aml_monitoring.cli import main; main()" drift
     deps:
       - data/HI-Small_Trans.csv
       - data/LI-Small_Trans.csv
-      - models/aml_lgbm.pkl
+      - models/hgb_compat.pkl
       - models/model_meta.pkl
       - src/aml_monitoring
     outs:

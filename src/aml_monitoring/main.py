@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import time
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,16 +18,19 @@ from .storage import Store
 
 store = Store()
 
+_experiments_cache: dict = {"data": None, "at": 0.0}
+
 
 def execute_drift_run(request: DriftRunRequest) -> dict:
     prediction_limit = request.prediction_limit or DRIFT_PREDICTION_LIMIT
     min_rows = request.min_rows or DRIFT_MIN_ROWS
-    source = "recent_predictions"
-    if request.transactions or request.batch_path or not request.use_recent_predictions:
+    if request.transactions or request.batch_path:
         result = run_drift(batch=request.transactions, batch_path=request.batch_path, min_rows=min_rows, source="request_batch")
-    else:
+    elif request.use_recent_predictions:
         payloads = store.recent_prediction_payloads(prediction_limit)
-        result = run_drift(batch=payloads, min_rows=min_rows, source=source)
+        result = run_drift(batch=payloads, min_rows=min_rows, source="recent_predictions")
+    else:
+        result = run_drift(min_rows=min_rows, source="dataset")
     store.add_drift_run(
         "combined",
         result["status"],
@@ -152,7 +156,11 @@ def retrain_jobs(limit: int = 20) -> dict:
 
 @app.get("/experiments")
 def experiments(limit: int = 50) -> dict:
-    return {"items": list_experiments(limit)}
+    now = time.time()
+    if _experiments_cache["data"] is None or now - _experiments_cache["at"] > 30:
+        _experiments_cache["data"] = list_experiments(limit)
+        _experiments_cache["at"] = now
+    return {"items": _experiments_cache["data"]}
 
 
 @app.get("/metrics")
