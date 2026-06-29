@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -29,3 +29,7 @@ class DriftRunRequest(BaseModel):
     use_recent_predictions: bool = True
     prediction_limit: int | None = None
     min_rows: int | None = None
+
+
+class PredictionLabelRequest(BaseModel):
+    actual_label: Literal[0, 1]

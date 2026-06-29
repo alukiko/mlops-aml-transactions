@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import f1_score, precision_score, recall_score, roc_auc_score
 
-from .config import DATA_FILES, MODEL_META_PATH, REFERENCE_SAMPLE_PATH, REPORT_DIR, TARGET
+from .config import DATA_FILES, DRIFT_MIN_LABELS, MODEL_META_PATH, REFERENCE_SAMPLE_PATH, REPORT_DIR, TARGET
 from .data import load_transactions, sample_reference
 from .features import engineer_features
 from .inference import get_model_service
@@ -140,7 +140,7 @@ def run_drift(
 
     target_drift = {"status": "not_enough_labels", "score": None, "threshold": 0.02}
     concept_drift = {"status": "not_enough_labels", "metrics": {}, "threshold": 0.05}
-    if TARGET in current_features.columns and current_features[TARGET].notna().sum() > 20:
+    if TARGET in current_features.columns and current_features[TARGET].notna().sum() >= DRIFT_MIN_LABELS:
         ref_rate = float(reference_features[TARGET].mean()) if TARGET in reference_features else 0.0
         cur_rate = float(current_features[TARGET].mean())
         score = abs(cur_rate - ref_rate)

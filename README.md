@@ -168,6 +168,14 @@ curl -X POST http://localhost:8000/predict \
 curl -X POST http://localhost:8000/drift/run -H "Content-Type: application/json" -d "{}"
 ```
 
+Добавление фактической метки к сохранённому предсказанию:
+
+```bash
+curl -X PATCH http://localhost:8000/predictions/123/label \
+  -H "Content-Type: application/json" \
+  -d '{"actual_label":1}'
+```
+
 Запуск переобучения:
 
 ```bash
@@ -183,6 +191,11 @@ curl -X POST http://localhost:8000/retrain
 - **data drift** — PSI и KS для числовых признаков, PSI для категориальных
 - **target drift** — изменение доли `Is Laundering` (если в batch есть labels)
 - **concept drift** — падение precision/recall/F1/ROC-AUC (если в batch есть labels)
+
+Для Target Drift и Concept Drift требуется минимум 21 фактическая метка среди последних
+`DRIFT_PREDICTION_LIMIT` предсказаний. Метки `0` (обычная транзакция) и `1` (отмывание)
+назначаются в таблице Recent Predictions или через `PATCH /predictions/{id}/label`.
+Прогресс возвращается полем `labeling` в `GET /predictions/recent`.
 
 В Kubernetes drift-check запускается CronJob каждые 15 минут (`k8s/base/drift-cronjob.yaml`).
 
