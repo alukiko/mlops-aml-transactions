@@ -1,9 +1,16 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Activity, AlertTriangle, BarChart3, FlaskConical, Play, RefreshCw, Search } from "lucide-react";
 import "./styles.css";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const DriftCharts = lazy(() => import("./DriftCharts.jsx"));
+const PAGES = [
+  { id: "inference", label: "Inference" },
+  { id: "monitoring", label: "Monitoring" },
+  { id: "experiments", label: "Experiments" },
+  { id: "operations", label: "Operations" },
+];
 
 const sampleTransaction = {
   Timestamp: "2022/09/01 00:20",
@@ -110,18 +117,22 @@ function RecentPredictions({ items }) {
 
 function dataDriftStatus(dd) {
   if (!dd) return "unknown";
-  return dd.score != null && dd.score > (dd.threshold ?? 0.2) ? "drift" : "ok";
+  return dd.score != null && dd.score >= (dd.threshold ?? 0.2) ? "drift" : "ok";
 }
 
 function Drift({ runs, onRefresh }) {
   const [running, setRunning] = useState(false);
+  const [error, setError] = useState("");
   async function run() {
     setRunning(true);
+    setError("");
     try {
-      await api("/drift/run", { method: "POST", body: JSON.stringify({ use_recent_predictions: false }) });
-      onRefresh();
+      await api("/drift/run", { method: "POST", body: JSON.stringify({ use_recent_predictions: true }) });
+    } catch (exc) {
+      setError(exc.message);
     } finally {
       setRunning(false);
+      onRefresh();
     }
   }
   const latest = runs[0];
@@ -133,9 +144,16 @@ function Drift({ runs, onRefresh }) {
         <h2>Drift Alerts</h2>
         <button onClick={run} disabled={running}><Activity size={16} /> {running ? "Running" : "Run drift"}</button>
       </div>
+      {error && <div className="notice danger">{error}</div>}
 
       {latest ? (
         <>
+          {latest.status === "drift" && (
+            <div className="notice danger drift-notification" role="alert" aria-live="polite">
+              <AlertTriangle size={18} />
+              Drift detected. Review the changed features before retraining.
+            </div>
+          )}
           <div className="drift-cards">
             <div className="drift-card">
               <span className="drift-card-label">Data Drift</span>
@@ -162,6 +180,9 @@ function Drift({ runs, onRefresh }) {
             <span>rows current {details?.rows?.current ?? "—"} / ref {details?.rows?.reference ?? "—"}</span>
             <span>{details?.source || "unknown source"}</span>
           </div>
+          <Suspense fallback={<div className="empty">Loading drift charts…</div>}>
+            <DriftCharts runs={runs} />
+          </Suspense>
         </>
       ) : <div className="empty">No drift reports yet</div>}
 
@@ -186,10 +207,14 @@ function Drift({ runs, onRefresh }) {
                     <StatusPill value={dataDriftStatus(d?.data_drift)} />
                     {" "}{d?.data_drift?.score?.toFixed(2) ?? "—"}
                   </td>
-                  <td><StatusPill value={d?.target_drift?.status ?? "unknown"} /></td>
-                  <td><StatusPill value={d?.concept_drift?.status ?? "unknown"} /></td>
+                  <td><StatusPill value={d?.target_drift?.status ?? "unknown"} />{" "}{d?.target_drift?.score?.toFixed(4) ?? "—"}</td>
+                  <td><StatusPill value={d?.concept_drift?.status ?? "unknown"} />{" "}{d?.concept_drift?.score?.toFixed(4) ?? "—"}</td>
                   <td>{d?.rows?.current ?? "—"}</td>
-                  <td>{run.report_html || run.report_json || "—"}</td>
+                  <td>
+                    {run.report_html || run.report_json ? (
+                      <a href={`${API}/drift/report/${run.id}`} target="_blank" rel="noreferrer">Open report</a>
+                    ) : "—"}
+                  </td>
                 </tr>
               );
             })}
@@ -262,6 +287,7 @@ function App() {
   const [driftRuns, setDriftRuns] = useState([]);
   const [experiments, setExperiments] = useState([]);
   const [jobs, setJobs] = useState([]);
+  const [activePage, setActivePage] = useState("inference");
 
   async function refresh() {
     const [p, d, e, j] = await Promise.all([
@@ -276,12 +302,36 @@ function App() {
     setJobs(j.items || []);
   }
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => {
+    refresh();
+    const id = setInterval(refresh, 15000);
+    return () => clearInterval(id);
+  }, []);
 
   const stats = useMemo(() => {
     const anomalies = predictions.filter((item) => item.anomaly_flag).length;
     return { total: predictions.length, anomalies, drift: driftRuns[0]?.status || "none", jobs: jobs[0]?.status || "none" };
   }, [predictions, driftRuns, jobs]);
+
+  let pageContent;
+  switch (activePage) {
+    case "monitoring":
+      pageContent = <Drift runs={driftRuns} onRefresh={refresh} />;
+      break;
+    case "experiments":
+      pageContent = <Experiments items={experiments} />;
+      break;
+    case "operations":
+      pageContent = <Operations jobs={jobs} onRefresh={refresh} />;
+      break;
+    default:
+      pageContent = (
+        <>
+          <Inference onRefresh={refresh} />
+          <RecentPredictions items={predictions} />
+        </>
+      );
+  }
 
   return (
     <main>
@@ -292,18 +342,26 @@ function App() {
         </div>
         <button className="ghost" onClick={refresh}><RefreshCw size={16} /> Refresh</button>
       </header>
+      <nav className="tabs" aria-label="Main sections">
+        {PAGES.map((page) => (
+          <button
+            className={`tab ${activePage === page.id ? "active" : ""}`}
+            key={page.id}
+            onClick={() => setActivePage(page.id)}
+            aria-pressed={activePage === page.id}
+          >
+            {page.label}
+          </button>
+        ))}
+      </nav>
       <div className="stats">
         <div className="stat"><BarChart3 size={18} /><span>Predictions</span><strong>{stats.total}</strong></div>
         <div className="stat"><AlertTriangle size={18} /><span>Anomalies</span><strong>{stats.anomalies}</strong></div>
         <div className="stat"><Activity size={18} /><span>Drift</span><strong>{stats.drift}</strong></div>
         <div className="stat"><Play size={18} /><span>Retraining</span><strong>{stats.jobs}</strong></div>
       </div>
-      <div className="grid">
-        <Inference onRefresh={refresh} />
-        <Drift runs={driftRuns} onRefresh={refresh} />
-        <RecentPredictions items={predictions} />
-        <Experiments items={experiments} />
-        <Operations jobs={jobs} onRefresh={refresh} />
+      <div className={`grid page-${activePage}`}>
+        {pageContent}
       </div>
     </main>
   );
