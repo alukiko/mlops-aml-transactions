@@ -241,7 +241,7 @@ kubectl apply -k k8s/base
 
 1. **lint-test** — `ruff check`, `pytest`, `npm run build`
 2. **build-images** — скачивает модель из S3, собирает и пушит Docker images в GHCR с тегами `:{sha}` и `:latest`
-3. **update-manifests** — заменяет image tag в `backend.yaml` / `frontend.yaml` на `{sha}`, коммитит `[skip ci]` обратно в main
+3. **update-manifests** — заменяет image tags во всех манифестах `k8s/base` на `{sha}`, коммитит `[skip ci]` обратно в main
 4. **deploy-argocd** — запускает `argocd app sync` (только если `ENABLE_ARGOCD_DEPLOY=true`)
 
 Secrets для CI/CD:

@@ -78,29 +78,6 @@ data:
         type: file
         options:
           path: /var/lib/grafana/dashboards
-  aml-monitoring.json: |
-    {
-      "uid": "aml-monitoring",
-      "title": "AML Monitoring",
-      "schemaVersion": 39,
-      "version": 2,
-      "refresh": "10s",
-      "panels": [
-        {"type":"stat","title":"API Requests","gridPos":{"x":0,"y":0,"w":4,"h":4},"targets":[{"expr":"sum(aml_api_requests_total)","refId":"A"}]},
-        {"type":"stat","title":"Predictions","gridPos":{"x":4,"y":0,"w":4,"h":4},"targets":[{"expr":"sum(aml_predictions_total)","refId":"A"}]},
-        {"type":"gauge","title":"Anomaly Rate","gridPos":{"x":8,"y":0,"w":4,"h":4},"targets":[{"expr":"aml_anomaly_rate","refId":"A"}]},
-        {"type":"gauge","title":"Avg Laundering Probability","gridPos":{"x":12,"y":0,"w":4,"h":4},"targets":[{"expr":"aml_average_laundering_probability","refId":"A"}]},
-        {"type":"stat","title":"Model Threshold","gridPos":{"x":16,"y":0,"w":4,"h":4},"targets":[{"expr":"aml_model_threshold","refId":"A"}]},
-        {"type":"stat","title":"Retraining Status","gridPos":{"x":20,"y":0,"w":4,"h":4},"targets":[{"expr":"aml_retraining_status","refId":"A"}]},
-        {"type":"timeseries","title":"API Request Rate by Endpoint","gridPos":{"x":0,"y":4,"w":12,"h":8},"targets":[{"expr":"sum(rate(aml_api_requests_total[5m])) by (path, status)","refId":"A","legendFormat":"{{path}} {{status}}"}]},
-        {"type":"timeseries","title":"Request Latency p95 by Endpoint","gridPos":{"x":12,"y":4,"w":12,"h":8},"targets":[{"expr":"histogram_quantile(0.95, sum(rate(aml_api_request_latency_seconds_bucket[5m])) by (le, path))","refId":"A","legendFormat":"{{path}}"}]},
-        {"type":"timeseries","title":"Model Quality","gridPos":{"x":0,"y":12,"w":12,"h":8},"targets":[{"expr":"aml_model_roc_auc","refId":"A","legendFormat":"ROC-AUC"},{"expr":"aml_model_pr_auc","refId":"B","legendFormat":"PR-AUC"},{"expr":"aml_model_precision","refId":"C","legendFormat":"Precision"},{"expr":"aml_model_recall","refId":"D","legendFormat":"Recall"},{"expr":"aml_model_f1","refId":"E","legendFormat":"F1"},{"expr":"aml_model_f2","refId":"F","legendFormat":"F2"}]},
-        {"type":"bargauge","title":"Prediction Classes","gridPos":{"x":12,"y":12,"w":6,"h":8},"targets":[{"expr":"sum(aml_predictions_total) by (predicted_class)","refId":"A","legendFormat":"class {{predicted_class}}"}]},
-        {"type":"stat","title":"Training Data","gridPos":{"x":18,"y":12,"w":6,"h":8},"targets":[{"expr":"aml_model_train_rows","refId":"A","legendFormat":"rows"},{"expr":"aml_model_train_positives","refId":"B","legendFormat":"positives"}]},
-        {"type":"timeseries","title":"Drift Scores","gridPos":{"x":0,"y":20,"w":12,"h":8},"targets":[{"expr":"aml_data_drift_score","refId":"A","legendFormat":"data"},{"expr":"aml_target_drift_score","refId":"B","legendFormat":"target"},{"expr":"aml_concept_drift_score","refId":"C","legendFormat":"concept"}]},
-        {"type":"timeseries","title":"API Errors","gridPos":{"x":12,"y":20,"w":12,"h":8},"targets":[{"expr":"sum(rate(aml_api_requests_total{status!~\"2..\"}[5m])) by (path, status)","refId":"A","legendFormat":"{{path}} {{status}}"}]}
-      ]
-    }
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -134,13 +111,16 @@ spec:
             - name: grafana-provisioning
               mountPath: /etc/grafana/provisioning/dashboards/dashboards.yml
               subPath: dashboards.yml
-            - name: grafana-provisioning
+            - name: grafana-dashboard
               mountPath: /var/lib/grafana/dashboards/aml-monitoring.json
               subPath: aml-monitoring.json
       volumes:
         - name: grafana-provisioning
           configMap:
             name: grafana-provisioning
+        - name: grafana-dashboard
+          configMap:
+            name: grafana-dashboard
 ---
 apiVersion: v1
 kind: Service
