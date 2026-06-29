@@ -5,7 +5,16 @@ from pathlib import Path
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError
 
-from .config import DATA_FILES, MODEL_FILES, S3_BUCKET, S3_DATA_PREFIX, S3_ENDPOINT_URL, S3_MODELS_PREFIX
+from .config import (
+    DATA_FILES,
+    MODEL_FILES,
+    MODEL_META_PATH,
+    MODEL_PATH,
+    S3_BUCKET,
+    S3_DATA_PREFIX,
+    S3_ENDPOINT_URL,
+    S3_MODELS_PREFIX,
+)
 
 
 def _client():
@@ -59,7 +68,9 @@ def download_data(required: bool = False) -> list[Path]:
 
 
 def download_models(required: bool = False) -> list[Path]:
-    return _download_files(MODEL_FILES, S3_MODELS_PREFIX, required=required)
+    downloaded = _download_files([MODEL_PATH], S3_MODELS_PREFIX, required=required)
+    downloaded.extend(_download_files([MODEL_META_PATH], S3_MODELS_PREFIX, required=False))
+    return downloaded
 
 
 def _upload_files(files: list[Path], prefix: str, required: bool = True) -> list[str]:
