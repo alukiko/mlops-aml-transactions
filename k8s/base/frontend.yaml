@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ghcr.io/alukiko/mlops-aml-transactions/aml-frontend:8b7b021de66eceae491f6943ca6c3149544a5532
+          image: ghcr.io/alukiko/mlops-aml-transactions/aml-frontend:91be85fbd8e27814b1ace7597bfa37895092e4ba
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
