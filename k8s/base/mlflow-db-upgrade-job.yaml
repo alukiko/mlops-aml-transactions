@@ -3,6 +3,9 @@ kind: Job
 metadata:
   name: mlflow-db-upgrade
   namespace: aml-monitoring
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
 spec:
   ttlSecondsAfterFinished: 300
   template:

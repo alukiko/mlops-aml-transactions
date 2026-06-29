@@ -18,16 +18,15 @@ spec:
           image: ghcr.io/alukiko/mlops-aml-transactions/aml-backend:latest
           imagePullPolicy: IfNotPresent
           command:
-            - mlflow
-            - ui
-            - --backend-store-uri
-            - sqlite:////app/runtime/mlflow.db
-            - --default-artifact-root
-            - /app/mlartifacts
-            - --host
-            - 0.0.0.0
-            - --port
-            - "5000"
+            - sh
+            - -c
+            - >-
+              mlflow db upgrade sqlite:////app/runtime/mlflow.db &&
+              exec mlflow ui
+              --backend-store-uri sqlite:////app/runtime/mlflow.db
+              --default-artifact-root /app/mlartifacts
+              --host 0.0.0.0
+              --port 5000
           envFrom:
             - configMapRef:
                 name: aml-config
