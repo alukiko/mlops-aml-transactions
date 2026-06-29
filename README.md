@@ -17,6 +17,56 @@ data/                        # IBM AML synthetic CSV (не коммитятся,
 reports/drift/               # Сгенерированные drift-отчёты
 ```
 
+## Выбор данных и модели
+
+Проект использует открытый синтетический датасет IBM AML (`HI-Small_Trans.csv` и
+`LI-Small_Trans.csv`) с целевой колонкой `Is Laundering`.
+
+В качестве baseline используется Logistic Regression. В MLflow сравниваются
+Logistic Regression, Random Forest, Extra Trees и HistGradientBoosting. Лучшая
+модель выбирается по Average Precision; FastAPI по умолчанию загружает
+`models/hgb_compat.pkl`.
+
+## Git workflow и Conventional Commits
+
+Используется GitHub Flow: рабочая ветка → Pull Request в `main` → CI → merge.
+Сообщения коммитов должны иметь вид:
+
+```text
+feat(scope): add feature
+fix: correct drift calculation
+docs: update runbook
+```
+
+Формат проверяется локальным `commit-msg` hook и GitHub Actions:
+
+```bash
+pre-commit install
+pre-commit install --hook-type commit-msg
+```
+
+## Cookiecutter
+
+В репозитории находится рабочий шаблон `{{cookiecutter.repo_name}}`. Создание
+нового проекта:
+
+```bash
+pip install -r requirements-dev.txt
+cookiecutter .
+```
+
+## DVC
+
+Данные, модель и drift-отчёты описаны в `dvc.yaml` и зафиксированы в
+`dvc.lock`. Remote `yandex-s3` настроен в `.dvc/config`.
+
+```bash
+pip install -r requirements-dev.txt
+dvc pull
+dvc repro
+dvc push
+```
+
 ## Локальный запуск без Docker
 
 ```bash
@@ -71,7 +121,8 @@ CSV-файлы и модели не хранятся в Git — только в 
 ```
 data/raw/HI-Small_Trans.csv
 data/raw/LI-Small_Trans.csv
-models/aml_lgbm.pkl
+models/hgb_compat.pkl
+models/model_meta.pkl
 models/reference_sample.csv
 ```
 
