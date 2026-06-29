@@ -7,6 +7,14 @@ resources:
   - frontend.yaml
   - mlflow.yaml
   - prometheus-grafana.yaml
-  - retraining-job.yaml
   - drift-cronjob.yaml
   - mlflow-db-upgrade-job.yaml
+
+configMapGenerator:
+  - name: grafana-dashboard
+    namespace: aml-monitoring
+    files:
+      - aml-monitoring.json=grafana/aml-monitoring.json
+
+generatorOptions:
+  disableNameSuffixHash: true

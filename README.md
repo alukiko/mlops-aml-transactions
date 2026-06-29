@@ -168,6 +168,14 @@ curl -X POST http://localhost:8000/predict \
 curl -X POST http://localhost:8000/drift/run -H "Content-Type: application/json" -d "{}"
 ```
 
+Добавление фактической метки к сохранённому предсказанию:
+
+```bash
+curl -X PATCH http://localhost:8000/predictions/123/label \
+  -H "Content-Type: application/json" \
+  -d '{"actual_label":1}'
+```
+
 Запуск переобучения:
 
 ```bash
@@ -183,6 +191,11 @@ curl -X POST http://localhost:8000/retrain
 - **data drift** — PSI и KS для числовых признаков, PSI для категориальных
 - **target drift** — изменение доли `Is Laundering` (если в batch есть labels)
 - **concept drift** — падение precision/recall/F1/ROC-AUC (если в batch есть labels)
+
+Для Target Drift и Concept Drift требуется минимум 21 фактическая метка среди последних
+`DRIFT_PREDICTION_LIMIT` предсказаний. Метки `0` (обычная транзакция) и `1` (отмывание)
+назначаются в таблице Recent Predictions или через `PATCH /predictions/{id}/label`.
+Прогресс возвращается полем `labeling` в `GET /predictions/recent`.
 
 В Kubernetes drift-check запускается CronJob каждые 15 минут (`k8s/base/drift-cronjob.yaml`).
 
@@ -216,7 +229,7 @@ pytest src/tests tests
 | `secret.yaml` | S3 credentials → envFrom в backend |
 | `configmap.yaml` | Переменные окружения |
 | `drift-cronjob.yaml` | CronJob drift-check (каждые 15 мин) |
-| `retraining-job.yaml` | Job для ручного переобучения |
+| `retraining-job.yaml` | Опциональный шаблон Job; Argo CD его не применяет, UI запускает `/retrain` через FastAPI |
 | `prometheus-grafana.yaml` | Prometheus + Grafana |
 
 Деплой через Argo CD (уже настроен):
@@ -241,7 +254,7 @@ kubectl apply -k k8s/base
 
 1. **lint-test** — `ruff check`, `pytest`, `npm run build`
 2. **build-images** — скачивает модель из S3, собирает и пушит Docker images в GHCR с тегами `:{sha}` и `:latest`
-3. **update-manifests** — заменяет image tag в `backend.yaml` / `frontend.yaml` на `{sha}`, коммитит `[skip ci]` обратно в main
+3. **update-manifests** — заменяет image tags во всех манифестах `k8s/base` на `{sha}`, коммитит `[skip ci]` обратно в main
 4. **deploy-argocd** — запускает `argocd app sync` (только если `ENABLE_ARGOCD_DEPLOY=true`)
 
 Secrets для CI/CD:

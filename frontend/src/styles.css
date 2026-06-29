@@ -53,6 +53,19 @@ th { background: #f7f9fb; color: #425466; font-weight: 700; position: sticky; to
 .pill.anomaly, .pill.drift, .pill.failed { background: #ffe8e6; color: #9c3128; }
 .pill.normal, .pill.ok, .pill.completed { background: #e4f6ee; color: #20664f; }
 .pill.queued, .pill.running { background: #fff3d6; color: #7a5700; }
+.label-progress {
+  display: flex; justify-content: space-between; gap: 12px; margin-bottom: 12px; padding: 10px 12px;
+  border: 1px solid #ead59b; border-radius: 6px; background: #fff8e7; color: #694d05;
+}
+.label-progress.ready { border-color: #addbc8; background: #e9f8f1; color: #195d48; }
+.label-actions { display: flex; gap: 6px; min-width: 218px; }
+.label-button {
+  padding: 6px 8px; border: 1px solid #b9c6d2; background: white; color: #425466;
+  font-size: 12px; white-space: nowrap;
+}
+.label-button:hover { background: #eef3f7; }
+.label-button.active { border-color: #1f7a68; background: #dff3ec; color: #195d48; }
+.label-button.dangerous.active { border-color: #b64136; background: #ffe8e6; color: #8f2c24; }
 .alert-line { display: flex; align-items: center; gap: 10px; padding: 12px; background: #f7f9fb; border-radius: 6px; margin-bottom: 12px; }
 .empty { color: #687684; padding: 12px; background: #f7f9fb; border-radius: 6px; }
 .drift-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
@@ -75,5 +88,6 @@ td a:hover { text-decoration: underline; }
   .panel:nth-child(n) { grid-column: auto; }
   .drift-cards, .drift-charts { grid-template-columns: 1fr; }
   .alert-line { flex-wrap: wrap; }
+  .label-progress { flex-direction: column; }
   .drift-card-score { overflow-wrap: anywhere; }
 }

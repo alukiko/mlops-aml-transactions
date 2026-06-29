@@ -55,7 +55,7 @@ services:
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
-      - "9091:9090"
+      - "9090:9090"
     depends_on:
       - backend
 
@@ -66,7 +66,7 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./k8s/base/grafana/aml-monitoring.json:/var/lib/grafana/dashboards/aml-monitoring.json:ro
     ports:
       - "3001:3000"
     depends_on:

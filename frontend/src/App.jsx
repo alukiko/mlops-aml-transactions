@@ -82,23 +82,75 @@ function Inference({ onRefresh }) {
   );
 }
 
-function RecentPredictions({ items }) {
+function RecentPredictions({ items, labeling, onRefresh }) {
+  const [labellingId, setLabellingId] = useState(null);
+  const [error, setError] = useState("");
+
+  async function setActualLabel(predictionId, actualLabel) {
+    setLabellingId(predictionId);
+    setError("");
+    try {
+      await api(`/predictions/${predictionId}/label`, {
+        method: "PATCH",
+        body: JSON.stringify({ actual_label: actualLabel })
+      });
+      await onRefresh();
+    } catch (exc) {
+      setError(exc.message);
+    } finally {
+      setLabellingId(null);
+    }
+  }
+
   return (
     <section className="panel">
       <div className="panel-header">
         <h2>Recent Predictions</h2>
       </div>
+      <div className={`label-progress ${labeling.ready ? "ready" : ""}`}>
+        <strong>Ground-truth labels: {labeling.labelled} / {labeling.required}</strong>
+        <span>
+          {labeling.ready
+            ? "Target and Concept Drift are ready to calculate."
+            : `${labeling.remaining} more labels required.`}
+        </span>
+      </div>
+      {error && <div className="notice danger">{error}</div>}
       <div className="table-wrap">
         <table>
           <thead>
-            <tr><th>ID</th><th>Time</th><th>Amount</th><th>Payment</th><th>Probability</th><th>Class</th><th>Flags</th></tr>
+            <tr>
+              <th>ID</th><th>Actual label</th><th>Time</th><th>Amount</th>
+              <th>Payment</th><th>Probability</th><th>Predicted</th><th>Flags</th>
+            </tr>
           </thead>
           <tbody>
             {items.map((item) => {
               const payload = item.payload || {};
+              const isSaving = labellingId === item.id;
               return (
                 <tr key={item.id}>
                   <td>{item.id}</td>
+                  <td>
+                    <div className="label-actions" aria-label={`Actual label for prediction ${item.id}`}>
+                      <button
+                        className={`label-button ${item.actual_label === 0 ? "active" : ""}`}
+                        disabled={isSaving}
+                        onClick={() => setActualLabel(item.id, 0)}
+                        aria-pressed={item.actual_label === 0}
+                      >
+                        0 · Legit
+                      </button>
+                      <button
+                        className={`label-button dangerous ${item.actual_label === 1 ? "active" : ""}`}
+                        disabled={isSaving}
+                        onClick={() => setActualLabel(item.id, 1)}
+                        aria-pressed={item.actual_label === 1}
+                      >
+                        1 · Laundering
+                      </button>
+                    </div>
+                  </td>
                   <td>{item.created_at}</td>
                   <td>{payload["Amount Paid"] ?? "-"}</td>
                   <td>{payload["Payment Format"] ?? "-"}</td>
@@ -284,6 +336,7 @@ function Operations({ jobs, onRefresh }) {
 
 function App() {
   const [predictions, setPredictions] = useState([]);
+  const [labeling, setLabeling] = useState({ labelled: 0, required: 21, remaining: 21, ready: false });
   const [driftRuns, setDriftRuns] = useState([]);
   const [experiments, setExperiments] = useState([]);
   const [jobs, setJobs] = useState([]);
@@ -297,6 +350,7 @@ function App() {
       api("/retrain/jobs")
     ]);
     setPredictions(p.items || []);
+    setLabeling(p.labeling || { labelled: 0, required: 21, remaining: 21, ready: false });
     setDriftRuns(d.items || []);
     setExperiments(e.items || []);
     setJobs(j.items || []);
@@ -328,7 +382,7 @@ function App() {
       pageContent = (
         <>
           <Inference onRefresh={refresh} />
-          <RecentPredictions items={predictions} />
+          <RecentPredictions items={predictions} labeling={labeling} onRefresh={refresh} />
         </>
       );
   }

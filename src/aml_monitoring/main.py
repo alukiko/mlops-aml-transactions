@@ -13,7 +13,7 @@ from .experiments import list_experiments
 from .inference import get_model_service
 from .metrics import PrometheusMiddleware, metrics_response, record_drift, record_predictions, record_retraining_status
 from .retraining import run_retraining
-from .schemas import DriftRunRequest, PredictRequest
+from .schemas import DriftRunRequest, PredictionLabelRequest, PredictRequest
 from .storage import Store
 
 store = Store()
@@ -109,7 +109,21 @@ def predict(request: PredictRequest) -> dict:
 
 @app.get("/predictions/recent")
 def recent_predictions(limit: int = 100) -> dict:
-    return {"items": store.recent_predictions(limit)}
+    return {
+        "items": store.recent_predictions(limit),
+        "labeling": store.prediction_labeling_status(DRIFT_PREDICTION_LIMIT),
+    }
+
+
+@app.patch("/predictions/{prediction_id}/label")
+def label_prediction(prediction_id: int, request: PredictionLabelRequest) -> dict:
+    item = store.set_prediction_label(prediction_id, request.actual_label)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Prediction not found")
+    return {
+        "item": item,
+        "labeling": store.prediction_labeling_status(DRIFT_PREDICTION_LIMIT),
+    }
 
 
 @app.get("/drift/status")

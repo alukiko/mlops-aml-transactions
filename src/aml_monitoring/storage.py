@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-from .config import DB_PATH
+from .config import DB_PATH, DRIFT_MIN_LABELS, TARGET
 
 
 def utc_now() -> str:
@@ -40,7 +40,8 @@ class Store:
                     probability real not null,
                     predicted_class integer not null,
                     anomaly_flag integer not null,
-                    drift_flag integer not null
+                    drift_flag integer not null,
+                    actual_label integer
                 );
                 create table if not exists drift_runs (
                     id integer primary key autoincrement,
@@ -64,15 +65,31 @@ class Store:
                 );
                 """
             )
+            prediction_columns = {row["name"] for row in conn.execute("pragma table_info(predictions)")}
+            if "actual_label" not in prediction_columns:
+                conn.execute("alter table predictions add column actual_label integer")
 
     def add_prediction(self, payload: dict[str, Any], probability: float, predicted_class: int, anomaly_flag: bool, drift_flag: bool) -> int:
+        actual_label = payload.get(TARGET)
+        if actual_label not in (0, 1):
+            actual_label = None
         with self.connect() as conn:
             cur = conn.execute(
                 """
-                insert into predictions(created_at, payload_json, probability, predicted_class, anomaly_flag, drift_flag)
-                values (?, ?, ?, ?, ?, ?)
+                insert into predictions(
+                    created_at, payload_json, probability, predicted_class, anomaly_flag, drift_flag, actual_label
+                )
+                values (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (utc_now(), json.dumps(payload, default=str), probability, predicted_class, int(anomaly_flag), int(drift_flag)),
+                (
+                    utc_now(),
+                    json.dumps(payload, default=str),
+                    probability,
+                    predicted_class,
+                    int(anomaly_flag),
+                    int(drift_flag),
+                    actual_label,
+                ),
             )
             return int(cur.lastrowid)
 
@@ -83,8 +100,46 @@ class Store:
 
     def recent_prediction_payloads(self, limit: int = 1000) -> list[dict[str, Any]]:
         with self.connect() as conn:
-            rows = conn.execute("select payload_json from predictions order by id desc limit ?", (limit,)).fetchall()
-        return [json.loads(row["payload_json"]) for row in rows]
+            rows = conn.execute(
+                "select payload_json, actual_label from predictions order by id desc limit ?",
+                (limit,),
+            ).fetchall()
+        payloads = []
+        for row in rows:
+            payload = json.loads(row["payload_json"])
+            if row["actual_label"] is not None:
+                payload[TARGET] = int(row["actual_label"])
+            payloads.append(payload)
+        return payloads
+
+    def set_prediction_label(self, prediction_id: int, actual_label: int) -> dict[str, Any] | None:
+        with self.connect() as conn:
+            conn.execute(
+                "update predictions set actual_label = ? where id = ?",
+                (actual_label, prediction_id),
+            )
+            row = conn.execute("select * from predictions where id = ?", (prediction_id,)).fetchone()
+        return self._row(row) if row else None
+
+    def prediction_labeling_status(self, limit: int = 1000) -> dict[str, int | bool]:
+        with self.connect() as conn:
+            row = conn.execute(
+                """
+                select count(*) as total, count(actual_label) as labelled
+                from (select actual_label from predictions order by id desc limit ?)
+                """,
+                (limit,),
+            ).fetchone()
+        total = int(row["total"])
+        labelled = int(row["labelled"])
+        return {
+            "total": total,
+            "labelled": labelled,
+            "unlabelled": total - labelled,
+            "required": DRIFT_MIN_LABELS,
+            "remaining": max(DRIFT_MIN_LABELS - labelled, 0),
+            "ready": labelled >= DRIFT_MIN_LABELS,
+        }
 
     def add_drift_run(self, drift_type: str, status: str, score: float | None, threshold: float | None, report_json: str | None, report_html: str | None, details: dict[str, Any]) -> int:
         with self.connect() as conn:

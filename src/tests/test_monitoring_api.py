@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from aml_monitoring import main
+from aml_monitoring.storage import Store
 
 
 class StubModelService:
@@ -63,6 +64,57 @@ def test_metrics_endpoint():
     response = client.get("/metrics")
     assert response.status_code == 200
     assert "aml_api_requests_total" in response.text
+
+
+def test_prediction_label_endpoint_adds_ground_truth_to_drift_payload(monkeypatch, tmp_path):
+    store = Store(tmp_path / "monitoring.db")
+    prediction_id = store.add_prediction(
+        {"Amount Paid": 100.0},
+        probability=0.12,
+        predicted_class=0,
+        anomaly_flag=False,
+        drift_flag=False,
+    )
+    monkeypatch.setattr(main, "store", store)
+    client = TestClient(main.app)
+
+    response = client.patch(f"/predictions/{prediction_id}/label", json={"actual_label": 1})
+
+    assert response.status_code == 200
+    assert response.json()["item"]["actual_label"] == 1
+    assert response.json()["labeling"]["labelled"] == 1
+    assert response.json()["labeling"]["remaining"] == 20
+    assert store.recent_prediction_payloads(1)[0]["Is Laundering"] == 1
+
+
+def test_prediction_label_endpoint_validates_label_and_prediction_id(monkeypatch, tmp_path):
+    store = Store(tmp_path / "monitoring.db")
+    monkeypatch.setattr(main, "store", store)
+    client = TestClient(main.app)
+
+    invalid_label = client.patch("/predictions/1/label", json={"actual_label": 2})
+    missing_prediction = client.patch("/predictions/1/label", json={"actual_label": 0})
+
+    assert invalid_label.status_code == 422
+    assert missing_prediction.status_code == 404
+
+
+def test_prediction_labeling_status_is_ready_after_21_labels(tmp_path):
+    store = Store(tmp_path / "monitoring.db")
+    for index in range(21):
+        store.add_prediction(
+            {"Amount Paid": float(index), "Is Laundering": index % 2},
+            probability=0.12,
+            predicted_class=0,
+            anomaly_flag=False,
+            drift_flag=False,
+        )
+
+    status = store.prediction_labeling_status()
+
+    assert status["labelled"] == 21
+    assert status["remaining"] == 0
+    assert status["ready"] is True
 
 
 def test_drift_run_uses_recent_predictions_by_default(monkeypatch):
