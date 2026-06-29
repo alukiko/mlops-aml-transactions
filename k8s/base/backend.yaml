@@ -15,7 +15,7 @@ spec:
     spec:
       initContainers:
         - name: sync-data
-          image: ghcr.io/alukiko/mlops-aml-transactions/aml-backend:47dfc37847450343f7c3e11445347cd1f2c048f7
+          image: ghcr.io/alukiko/mlops-aml-transactions/aml-backend:8b7b021de66eceae491f6943ca6c3149544a5532
           imagePullPolicy: Always
           command:
             - sh
@@ -43,7 +43,7 @@ spec:
               mountPath: /shared
       containers:
         - name: backend
-          image: ghcr.io/alukiko/mlops-aml-transactions/aml-backend:47dfc37847450343f7c3e11445347cd1f2c048f7
+          image: ghcr.io/alukiko/mlops-aml-transactions/aml-backend:8b7b021de66eceae491f6943ca6c3149544a5532
           imagePullPolicy: Always
           envFrom:
             - configMapRef:
