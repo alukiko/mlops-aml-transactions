@@ -1,5 +1,6 @@
 import pandas as pd
 
+from aml_monitoring.config import TARGET
 from aml_monitoring.data import normalize_transactions
 from aml_monitoring.drift import STABLE_ENGINEERED_FEATURES, categorical_psi, ks_statistic, psi, run_drift
 from aml_monitoring.features import FEATURE_COLS, build_preprocessor, engineer_features, to_feature_matrix
@@ -108,6 +109,7 @@ def test_psi_counts_values_outside_reference_range():
 
 def test_drift_uses_only_comparable_engineered_features(monkeypatch, tmp_path):
     reference = pd.concat([sample_frame()] * 20, ignore_index=True)
+    reference[TARGET] = None
     monkeypatch.setattr("aml_monitoring.drift.get_reference", lambda: reference)
     monkeypatch.setattr("aml_monitoring.drift.write_report", lambda result: (tmp_path / "drift.json", tmp_path / "drift.html"))
 
