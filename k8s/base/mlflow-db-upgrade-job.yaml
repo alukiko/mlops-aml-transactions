@@ -13,7 +13,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: mlflow-db-upgrade
-          image: ghcr.io/alukiko/mlops-aml-transactions/aml-backend:152a27289ff7bd019ec3e150971ddad3228e03da
+          image: ghcr.io/alukiko/mlops-aml-transactions/aml-backend:d108a76e83e8eb269a77c13c6f072b70139491f8
           imagePullPolicy: IfNotPresent
           command:
             - mlflow
